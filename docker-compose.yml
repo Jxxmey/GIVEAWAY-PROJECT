@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  # 1. Database (เหมือนเดิม)
+  mongodb:
+    image: mongo:latest
+    container_name: riser_mongo
+    volumes:
+      - mongo_data:/data/db
+    ports:
+      - "27017:27017"
+
+  # 2. App (รวม Frontend + Backend + Nginx ไว้ในตัวเดียว)
+  web_app:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    container_name: riser_web_app
+    restart: always
+    environment:
+      # ชี้ไปที่ Container mongodb (ไม่ใช่ localhost)
+      MONGO_URI: mongodb://mongodb:27017
+      # ใส่ Key ของคุณที่นี่ หรือสร้างไฟล์ .env แยกก็ได้
+      GEMINI_API_KEY: ${GEMINI_API_KEY} 
+      ADMIN_SECRET: ${ADMIN_SECRET}
+    ports:
+      - "80:8000"  # เข้าเว็บผ่าน http://localhost ได้เลย (Map Port 80 เครื่องเรา -> 8000 Container)
+    depends_on:
+      - mongodb
+
+volumes:
+  mongo_data:
