@@ -2,21 +2,21 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ตั้งค่าพื้นหลังสีดำสนิท */
 body {
   background-color: #000000;
   color: #ffffff;
   overflow-x: hidden;
+  -webkit-tap-highlight-color: transparent; /* ปิดสีฟ้าเวลากดปุ่มบนมือถือ */
 }
 
-/* ปรับ Scrollbar ให้เท่ๆ */
+/* Custom Scrollbar */
 ::-webkit-scrollbar {
-  width: 6px;
+  width: 4px;
 }
 ::-webkit-scrollbar-track {
-  background: #0a0a0a;
+  background: #000;
 }
 ::-webkit-scrollbar-thumb {
   background: #333;
-  border-radius: 10px;
+  border-radius: 4px;
 }
