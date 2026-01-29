@@ -1,0 +1,45 @@
+version: '3.8'
+
+services:
+  # 1. Database
+  mongodb:
+    image: mongo:latest
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
+    volumes:
+      - mongo_data:/data/db
+
+  # 2. Backend (FastAPI)
+  backend:
+    build: ./backend
+    container_name: riser_backend
+    restart: always
+    env_file: .env
+    volumes:
+      - ./processed_images:/app/images  # map โฟลเดอร์รูปที่ทำเสร็จแล้วเข้าไป
+    depends_on:
+      - mongodb
+
+  # 3. Frontend (React)
+  frontend:
+    build: ./frontend
+    container_name: riser_frontend
+    restart: always
+    depends_on:
+      - backend
+
+  # 4. Gateway (Nginx Main)
+  nginx:
+    image: nginx:alpine
+    container_name: riser_gateway
+    volumes:
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf
+    ports:
+      - "80:80"
+    depends_on:
+      - frontend
+      - backend
+
+volumes:
+  mongo_data:
