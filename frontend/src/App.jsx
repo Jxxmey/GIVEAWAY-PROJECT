@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import './App.css'
 import { Sparkles, Share2, Download, User, Music, Info, CheckCircle2, Heart, Maximize2, X, Twitter } from 'lucide-react'
-import confetti from 'canvas-confetti' // NEW! Import Confetti
+import confetti from 'canvas-confetti'
 
 function App() {
   const [step, setStep] = useState('landing')
@@ -37,7 +37,7 @@ function App() {
         setTimeout(() => {
           setResult(data.data)
           setStep('result')
-          triggerConfetti() // NEW! ยิงพลุเมื่อสำเร็จ
+          triggerConfetti()
         }, 2000)
       } else if (data.status === 'already_played') {
         setTimeout(() => {
@@ -57,28 +57,21 @@ function App() {
     }
   }
 
-  // NEW! ฟังก์ชันยิงพลุ
   const triggerConfetti = () => {
     const duration = 3 * 1000;
     const animationEnd = Date.now() + duration;
     const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 0 };
-
     const randomInRange = (min, max) => Math.random() * (max - min) + min;
 
     const interval = setInterval(function() {
       const timeLeft = animationEnd - Date.now();
-
-      if (timeLeft <= 0) {
-        return clearInterval(interval);
-      }
-
+      if (timeLeft <= 0) return clearInterval(interval);
       const particleCount = 50 * (timeLeft / duration);
       confetti({ ...defaults, particleCount, origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 } });
       confetti({ ...defaults, particleCount, origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 } });
     }, 250);
   }
 
-  // NEW! ฟังก์ชันแชร์ไป Twitter
   const handleShareTwitter = () => {
     const text = `สุ่มกาชา Riser Concert ได้รูปสวยมาก! 🔮✨\n\nมาเล่นกันที่ Fan Project by @Jaiidees\n\n#RiserConcert #JaiideesGiveaway`;
     const url = window.location.href;
@@ -113,7 +106,6 @@ function App() {
       </header>
 
       {/* --- MAIN CONTENT --- */}
-      {/* NEW! เพิ่ม pb-32 กัน Footer บังเนื้อหาบนมือถือ */}
       <main className="flex-1 w-full max-w-md mx-auto px-6 pt-24 pb-32 flex flex-col justify-center relative z-10 min-h-[100dvh]">
 
         {/* STEP 1: LANDING & RULES */}
@@ -133,8 +125,8 @@ function App() {
               </h1>
             </div>
 
-            {/* RULES CARD */}
-            <div className="bg-white/80 backdrop-blur-xl border border-white rounded-3xl p-6 shadow-xl shadow-purple-100/50 relative overflow-hidden group hover:scale-[1.02] transition-transform duration-500">
+            {/* 🔥 RULES CARD (UPDATED: More Detail) */}
+            <div className="bg-white/80 backdrop-blur-xl border border-white rounded-3xl p-6 shadow-xl shadow-purple-100/50 relative overflow-hidden group hover:scale-[1.01] transition-transform duration-500">
               <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400"></div>
               
               <h2 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
@@ -143,18 +135,26 @@ function App() {
               </h2>
               
               <ul className="space-y-3">
-                {[
-                  "สงวนสิทธิ์ 1 ท่าน / 1 ครั้ง (ตรวจสอบ IP)",
-                  "เลือกทีมศิลปินที่ต้องการ (ชาย/หญิง) เพื่อสุ่ม",
-                  "รับภาพ Wallpaper Exclusive + คำอวยพร",
-                  "กิจกรรม Fan Project ไม่มีค่าใช้จ่าย",
-                  "ภาพที่ได้เป็นลิขสิทธิ์ของกิจกรรม ห้ามจำหน่าย"
-                ].map((rule, idx) => (
-                  <li key={idx} className="flex items-center gap-3 text-xs text-slate-600 font-medium">
-                    <CheckCircle2 size={14} className="text-pink-400 flex-shrink-0" />
-                    {rule}
-                  </li>
-                ))}
+                <li className="flex items-start gap-3 text-xs text-slate-600 font-medium leading-relaxed">
+                  <CheckCircle2 size={16} className="text-pink-400 flex-shrink-0 mt-0.5" />
+                  <span>จำกัดสิทธิ์การร่วมสนุก <strong>1 ท่าน / 1 ครั้ง</strong> เท่านั้น (ระบบตรวจสอบผ่าน IP Address)</span>
+                </li>
+                <li className="flex items-start gap-3 text-xs text-slate-600 font-medium leading-relaxed">
+                   <CheckCircle2 size={16} className="text-pink-400 flex-shrink-0 mt-0.5" />
+                   <span>ผู้เล่นสามารถเลือก <strong>ประเภทการ์ด</strong> ที่ต้องการได้ก่อนเริ่มสุ่ม</span>
+                </li>
+                <li className="flex items-start gap-3 text-xs text-slate-600 font-medium leading-relaxed">
+                   <CheckCircle2 size={16} className="text-pink-400 flex-shrink-0 mt-0.5" />
+                   <span>ของรางวัลคือภาพ <strong>Wallpaper Exclusive</strong> และคำอวยพรพิเศษจาก AI</span>
+                </li>
+                 <li className="flex items-start gap-3 text-xs text-slate-600 font-medium leading-relaxed">
+                   <CheckCircle2 size={16} className="text-pink-400 flex-shrink-0 mt-0.5" />
+                   <span>กิจกรรมนี้เป็น <strong>Fan Project</strong> จัดทำเพื่อความบันเทิง <strong>ไม่มีค่าใช้จ่าย</strong></span>
+                </li>
+                 <li className="flex items-start gap-3 text-xs text-slate-600 font-medium leading-relaxed">
+                   <CheckCircle2 size={16} className="text-pink-400 flex-shrink-0 mt-0.5" />
+                   <span>ภาพที่ได้รับถือเป็นลิขสิทธิ์ของกิจกรรม <strong>ห้ามนำไปจำหน่าย</strong></span>
+                </li>
               </ul>
             </div>
 
@@ -287,7 +287,6 @@ function App() {
                   <a href={result.image_url} download target="_blank" className="flex items-center justify-center gap-2 py-3 rounded-xl bg-slate-900 text-white text-xs font-bold hover:bg-slate-700 transition-colors shadow-lg">
                     <Download size={14} /> SAVE
                   </a>
-                  {/* NEW! Share to Twitter Button */}
                   <button 
                     onClick={handleShareTwitter} 
                     className="flex items-center justify-center gap-2 py-3 rounded-xl bg-[#1D9BF0] border border-[#1D9BF0] text-white text-xs font-bold hover:brightness-110 transition-colors"

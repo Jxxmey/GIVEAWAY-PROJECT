@@ -16,6 +16,7 @@ app = FastAPI()
 # Config
 MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017")
 GEMINI_KEY = os.getenv("GEMINI_API_KEY")
+ADMIN_SECRET = os.getenv("ADMIN_SECRET", "my_super_secret")
 
 app.add_middleware(
     CORSMiddleware,
@@ -143,6 +144,21 @@ def get_image(gender: str, filename: str):
     if os.path.exists(path):
         return FileResponse(path)
     raise HTTPException(404)
+
+@app.get("/api/admin/history")
+async def get_history(request: Request):
+    # ตรวจสอบรหัสผ่านจาก Header
+    auth_header = request.headers.get("X-Admin-Key")
+    if auth_header != ADMIN_SECRET:
+        raise HTTPException(401, "Unauthorized: Access Denied")
+
+    try:
+        # ดึงข้อมูล 100 คนล่าสุด (เรียงจากใหม่ไปเก่า)
+        cursor = players.find({}, {"_id": 0}).sort("played_at", -1).limit(100)
+        logs = list(cursor)
+        return {"status": "success", "data": logs}
+    except Exception as e:
+        raise HTTPException(500, str(e))
 
 # --- 4. Frontend Serve ---
 if os.path.exists(os.path.join(STATIC_DIR, "assets")):
