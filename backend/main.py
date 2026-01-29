@@ -7,7 +7,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pymongo import MongoClient
-from google import genai  # ✅ ใช้ตัวใหม่
+from google import genai 
 
 # --- 1. Configuration & Setup ---
 
@@ -34,7 +34,7 @@ try:
 except Exception as e:
     print(f"❌ MongoDB Error: {e}")
 
-# AI Setup (New SDK)
+# AI Setup
 client_ai = None
 if GEMINI_KEY:
     try:
@@ -54,7 +54,6 @@ def get_ip_hash(ip: str):
 def get_random_image(gender: str):
     target_dir = os.path.join(IMAGE_DIR, gender)
     if not os.path.exists(target_dir):
-        # Fallback to assets
         fallback = os.path.join("/app/assets", gender)
         if os.path.exists(fallback):
             target_dir = fallback
@@ -68,11 +67,17 @@ def get_random_image(gender: str):
 
 async def generate_blessing(name: str, gender: str):
     if not client_ai:
-        return "ขอให้สนุกกับ Riser Concert นะครับ! (System)"
+        return "ขอให้มีความสุขมากๆ กับคอนเสิร์ตครั้งนี้นะครับ ขอบคุณที่มาเป็นกำลังใจให้กันเสมอ ขอให้วันนี้เป็นวันที่ดีของคุณครับ!"
     
     try:
-        prompt = f"เขียนคำอวยพรสั้นๆ 1-2 ประโยค ภาษาไทย ให้แฟนคลับชื่อ {name} เมน {gender} งาน Riser Concert"
-        # ✅ เรียกใช้แบบใหม่
+        # ปรับ Prompt: ขอให้ยาวขึ้น อบอุ่นขึ้น และไม่ต้องบอกว่าเป็น AI
+        prompt = (
+            f"เขียนข้อความอวยพรแฟนคลับที่มาร่วมงาน 'Riser Concert' ให้กับคุณ '{name}' "
+            f"(แฟนคลับคนนี้ชอบศิลปินฝั่ง: {gender}) "
+            f"ขอภาษาไทยที่อบอุ่น ซึ้งกินใจ เป็นกันเอง และให้กำลังใจ "
+            f"ความยาวประมาณ 3-4 ประโยค ไม่ต้องลงชื่อท้ายข้อความ"
+        )
+        
         response = await client_ai.aio.models.generate_content(
             model='gemini-1.5-flash',
             contents=prompt
@@ -80,7 +85,7 @@ async def generate_blessing(name: str, gender: str):
         return response.text.strip()
     except Exception as e:
         print(f"⚠️ AI Gen Error: {e}")
-        return "ขอให้วันนี้เป็นวันที่ดีของคุณนะครับ! (Riser Team)"
+        return "ขอบคุณที่มาร่วมสร้างความทรงจำดีๆ ด้วยกันในวันนี้นะครับ ขอให้กลับบ้านปลอดภัยและมีความสุขมากๆ ครับ!"
 
 # --- 3. Routes ---
 
@@ -97,8 +102,6 @@ async def play_gacha(request: Request):
 
         # Check Duplicate
         if players.find_one({"ip_hash": ip_hash}):
-            # (Logic เดิม: ถ้าเคยเล่นแล้ว ให้คืนค่าเดิม หรือ Error ก็ได้)
-            # เพื่อความง่าย ดึงค่าเดิมมาแสดง
             old = players.find_one({"ip_hash": ip_hash})
             return {
                 "status": "already_played",
