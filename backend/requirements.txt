@@ -1,7 +1,7 @@
 fastapi
 uvicorn
 pymongo
-google-generativeai
+google-genai
 python-multipart
 requests
 pillow

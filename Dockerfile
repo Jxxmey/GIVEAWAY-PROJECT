@@ -12,7 +12,7 @@ RUN npm run build
 # ผลลัพธ์จะอยู่ที่ /app/frontend/dist
 
 # --- Stage 2: Setup Backend & Final Image ---
-FROM python:3.9-slim
+FROM python:3.11-slim
 
 WORKDIR /app
 
