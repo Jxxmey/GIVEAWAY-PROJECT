@@ -1,33 +1,62 @@
-import { useState } from 'react'
-import { Lock, Database, Clock, Image as ImageIcon, LogOut, Trash2 } from 'lucide-react' // เพิ่ม Trash2
+import { useState, useEffect } from 'react'
+import { Lock, Database, Clock, Image as ImageIcon, LogOut, Trash2, FileDown, ShieldCheck, Power } from 'lucide-react'
 
 export default function Admin() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [secretKey, setSecretKey] = useState('')
   const [data, setData] = useState([])
   const [loading, setLoading] = useState(false)
+  const [systemActive, setSystemActive] = useState(false) // ✅ State สำหรับสถานะระบบ
+
+  // Fetch ข้อมูลและสถานะระบบเมื่อ Login ผ่าน
+  const fetchAllData = async (key) => {
+    try {
+        // 1. ดึง History
+        const resHistory = await fetch('/api/admin/history', { headers: { 'X-Admin-Key': key } })
+        
+        // 2. ดึง System Status
+        const resStatus = await fetch('/api/admin/system_status', { headers: { 'X-Admin-Key': key } })
+        
+        if (resHistory.ok && resStatus.ok) {
+            const jsonHistory = await resHistory.json()
+            const jsonStatus = await resStatus.json()
+            
+            setData(jsonHistory.data)
+            setSystemActive(jsonStatus.is_active)
+            setIsAuthenticated(true)
+        } else {
+            alert("❌ Access Denied: รหัสผ่านไม่ถูกต้อง")
+        }
+    } catch (err) {
+        alert("Error connecting to server")
+    }
+  }
 
   const handleLogin = async (e) => {
     e.preventDefault()
     setLoading(true)
-    
-    try {
-      const res = await fetch('/api/admin/history', {
-        headers: { 'X-Admin-Key': secretKey }
-      })
+    await fetchAllData(secretKey)
+    setLoading(false)
+  }
+
+  // ✅ ฟังก์ชันกดสวิตช์ เปิด/ปิด
+  const toggleSystem = async () => {
+      const confirmMsg = systemActive 
+          ? "🔴 ต้องการ 'ปิด' ระบบหรือไม่?\n(ผู้ใช้จะไม่สามารถเล่นเกมได้)" 
+          : "🟢 ต้องการ 'เปิด' ระบบหรือไม่?\n(ผู้ใช้จะเริ่มเล่นเกมได้ทันที)";
       
-      if (res.status === 200) {
-        const json = await res.json()
-        setData(json.data)
-        setIsAuthenticated(true)
-      } else {
-        alert("❌ Access Denied: รหัสผ่านไม่ถูกต้อง")
+      if (!window.confirm(confirmMsg)) return;
+
+      try {
+          const res = await fetch('/api/admin/toggle_system', {
+              method: 'POST',
+              headers: { 'X-Admin-Key': secretKey }
+          })
+          const data = await res.json()
+          setSystemActive(data.is_active)
+      } catch (err) {
+          alert("เกิดข้อผิดพลาดในการเปลี่ยนสถานะ")
       }
-    } catch (err) {
-      alert("Error connecting to server")
-    } finally {
-      setLoading(false)
-    }
   }
 
   const handleDelete = async (ipHash) => {
@@ -40,7 +69,6 @@ export default function Admin() {
         })
 
         if (res.ok) {
-            // ลบสำเร็จ -> เอาออกจากหน้าจอนี้ทันที
             setData(data.filter(item => item.ip_hash !== ipHash))
         } else {
             alert("ลบไม่สำเร็จ")
@@ -55,6 +83,31 @@ export default function Admin() {
     setIsAuthenticated(false)
     setSecretKey('')
     setData([])
+  }
+
+  const exportToCSV = () => {
+    const headers = ["Timestamp", "Name", "Gender", "IP Hash (ID)", "Message", "Image File"];
+    
+    const rows = data.map(row => [
+        new Date(row.played_at).toLocaleString('en-US'),
+        `"${row.name.replace(/"/g, '""')}"`,
+        row.gender,
+        row.ip_hash,
+        `"${row.blessing.replace(/"/g, '""').replace(/\n/g, ' ')}"`,
+        row.image_file
+    ]);
+
+    const csvContent = "data:text/csv;charset=utf-8," 
+        + headers.join(",") + "\n" 
+        + rows.map(e => e.join(",")).join("\n");
+
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `Riser_Gacha_Export_${new Date().toISOString().slice(0,10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   }
 
   // --- LOGIN SCREEN ---
@@ -98,8 +151,10 @@ export default function Admin() {
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-800">
       {/* Navbar */}
-      <nav className="bg-white border-b border-slate-200 px-6 py-4 flex justify-between items-center sticky top-0 z-50 shadow-sm">
-        <div className="flex items-center gap-2">
+      <nav className="bg-white border-b border-slate-200 px-6 py-4 flex flex-col md:flex-row justify-between items-center sticky top-0 z-50 shadow-sm gap-4">
+        
+        {/* Left: Title */}
+        <div className="flex items-center gap-2 w-full md:w-auto">
           <div className="bg-blue-100 p-2 rounded-lg text-blue-600">
             <Database size={20} />
           </div>
@@ -108,46 +163,82 @@ export default function Admin() {
             <p className="text-[10px] text-slate-500">History Log ({data.length})</p>
           </div>
         </div>
-        <button 
-          onClick={handleLogout}
-          className="flex items-center gap-2 text-xs font-bold text-red-500 hover:bg-red-50 px-3 py-2 rounded-lg transition-colors border border-red-100"
+
+        {/* Center: System Toggle */}
+        <div 
+            onClick={toggleSystem}
+            className={`cursor-pointer flex items-center gap-3 px-4 py-2 rounded-full border transition-all select-none shadow-sm ${
+                systemActive 
+                ? 'bg-green-50 border-green-200 text-green-700 hover:bg-green-100' 
+                : 'bg-red-50 border-red-200 text-red-700 hover:bg-red-100'
+            }`}
         >
-          <LogOut size={14} /> Logout
-        </button>
+            <div className={`w-3 h-3 rounded-full ${systemActive ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`}></div>
+            <span className="text-xs font-bold uppercase tracking-wide">
+                SYSTEM: {systemActive ? 'ONLINE (OPEN)' : 'OFFLINE (CLOSED)'}
+            </span>
+            <Power size={14} />
+        </div>
+
+        {/* Right: Actions */}
+        <div className="flex items-center gap-2 w-full md:w-auto justify-end">
+            <button 
+                onClick={exportToCSV}
+                className="flex items-center gap-2 text-xs font-bold text-green-700 bg-green-50 hover:bg-green-100 px-3 py-2 rounded-lg transition-colors border border-green-200"
+            >
+                <FileDown size={14} /> CSV
+            </button>
+            <button 
+                onClick={handleLogout}
+                className="flex items-center gap-2 text-xs font-bold text-red-500 hover:bg-red-50 px-3 py-2 rounded-lg transition-colors border border-red-100"
+            >
+                <LogOut size={14} /> Logout
+            </button>
+        </div>
       </nav>
 
       {/* Content */}
-      <main className="max-w-5xl mx-auto p-6">
+      <main className="max-w-6xl mx-auto p-6">
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
               <thead className="bg-slate-50 border-b border-slate-200 text-slate-500">
                 <tr>
-                  <th className="px-6 py-4 font-medium w-40">Timestamp</th>
-                  <th className="px-6 py-4 font-medium">User Info</th>
-                  <th className="px-6 py-4 font-medium">Message</th>
-                  <th className="px-6 py-4 font-medium text-right">Actions</th>
+                  <th className="px-4 py-4 font-medium w-32">Timestamp</th>
+                  <th className="px-4 py-4 font-medium w-48">User Info</th>
+                  <th className="px-4 py-4 font-medium w-32">IP Hash (ID)</th>
+                  <th className="px-4 py-4 font-medium">Message</th>
+                  <th className="px-4 py-4 font-medium text-right w-32">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {data.map((log, idx) => (
                   <tr key={idx} className="hover:bg-slate-50/80 transition-colors group">
-                    <td className="px-6 py-4 text-slate-400 text-xs flex items-center gap-2">
-                      <Clock size={12} />
-                      {new Date(log.played_at).toLocaleString('th-TH')}
+                    <td className="px-4 py-4 text-slate-400 text-xs flex flex-col gap-1">
+                      <div className="flex items-center gap-1">
+                          <Clock size={12} />
+                          {new Date(log.played_at).toLocaleDateString('th-TH')}
+                      </div>
+                      <span className="pl-4">{new Date(log.played_at).toLocaleTimeString('th-TH')}</span>
                     </td>
-                    <td className="px-6 py-4">
-                      <div className="font-bold text-slate-700">{log.name || 'Anonymous'}</div>
+                    <td className="px-4 py-4">
+                      <div className="font-bold text-slate-800">{log.name || 'Anonymous'}</div>
                       <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold mt-1 ${
                         log.gender === 'male' ? 'bg-blue-100 text-blue-700' : 'bg-pink-100 text-pink-700'
                       }`}>
                         {log.gender === 'male' ? 'BOY SIDE' : 'GIRL SIDE'}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-slate-600 italic text-xs max-w-xs truncate">
+                    <td className="px-4 py-4">
+                        <div className="flex items-center gap-1 text-[10px] font-mono text-slate-500 bg-slate-100 px-2 py-1 rounded border border-slate-200" title={log.ip_hash}>
+                            <ShieldCheck size={10} className="text-slate-400"/>
+                            {log.ip_hash.substring(0, 8)}...
+                        </div>
+                    </td>
+                    <td className="px-4 py-4 text-slate-600 italic text-xs max-w-xs truncate">
                       "{log.blessing}"
                     </td>
-                    <td className="px-6 py-4 text-right">
+                    <td className="px-4 py-4 text-right">
                       <div className="flex items-center justify-end gap-2">
                         <a 
                             href={`/api/image/${log.gender}/${log.image_file}`} 
