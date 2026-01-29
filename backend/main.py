@@ -9,7 +9,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pymongo import MongoClient
-from google import genai # ✅ ใช้ Library ตัวใหม่ (google-genai)
+from google import genai
 from google.genai import types
 
 # --- 1. Configuration & Setup ---
@@ -22,8 +22,8 @@ GEMINI_KEY = os.getenv("GEMINI_API_KEY")
 ADMIN_SECRET = os.getenv("ADMIN_SECRET", "my_super_secret")
 SELF_URL = os.getenv("RENDER_EXTERNAL_URL", "http://127.0.0.1:8000")
 
-# ✅ กำหนดชื่อโมเดลที่นี่ (ถ้ามี gemini-3 ก็แก้ตรงนี้ได้เลย)
-AI_MODEL_NAME = "gemini-flash-latest" 
+# ใช้ค่าจาก .env ถ้าไม่มีให้ใช้ gemini-2.0-flash-exp
+AI_MODEL_NAME = os.getenv("AI_MODEL_NAME", "gemini-flash-latest")
 
 app.add_middleware(
     CORSMiddleware,
@@ -48,7 +48,7 @@ try:
 except Exception as e:
     print(f"❌ MongoDB Error: {e}")
 
-# AI Setup (google-genai Client)
+# AI Setup
 client_ai = None
 if GEMINI_KEY:
     try:
@@ -98,63 +98,62 @@ def get_random_image(gender: str):
         raise HTTPException(500, "No images found")
     return random.choice(files)
 
-# ✅ ฟังก์ชัน AI (Updated for google-genai SDK)
+# ✅ ฟังก์ชัน AI (Fan Project Tone)
 async def generate_blessing(name: str, gender: str, lang: str):
-    error_msg_th = "ขออภัยครับ ระบบกำลังส่งความรักให้ทุกคนอย่างหนักจนพักเหนื่อย (AI Error) กรุณาลองใหม่นะ!"
-    error_msg_en = "Sorry! The system is overwhelmed with sending love (AI Error). Please try again!"
+    error_msg_th = "ตอนนี้คนเล่นเยอะมาก ระบบขอพักจิบน้ำแป๊บ (AI Error) ลองกดใหม่นะเตง!"
+    error_msg_en = "Too many fans joining! System needs a quick break (AI Error). Please try again!"
     
     if not client_ai:
         return error_msg_en if lang == 'en' else error_msg_th
     
     try:
-        # Prompt Setup
+        # --- PROMPT ภาษาไทย (ฉบับแฟนคลับ) ---
         prompt_th = f"""
-        Role: คุณคือ "ตัวแทนความสุข" ของงาน Riser Concert ที่คอยส่งจดหมายขอบคุณให้แฟนคลับ
-        Tone: อบอุ่น, จริงใจ, สุภาพ, ให้เกียรติ, และเต็มไปด้วยพลังบวก (เหมือนเขียนจดหมายหาคนสำคัญ)
-        Language: ภาษาไทยที่สละสลวย กินใจ น่าอ่าน (ความยาวประมาณ 4-5 บรรทัด)
+        Role: คุณคือตัวแทนจาก "โปรเจกต์แฟนคลับ (@Jaiidees)" ที่ทำกิจกรรมแจกของที่ระลึกด้วยใจรัก
+        Tone: อบอุ่น, ละมุน, เป็นกันเอง (เหมือนเพื่อนคุยกับเพื่อน), น่ารัก, ให้เกียรติ แต่ไม่ทางการ (Not Official)
+        Language: ภาษาไทยที่อ่านแล้วยิ้มตาม (ความยาว 3-4 บรรทัด)
 
-        Input: แฟนคลับชื่อ "{name}" ผู้ชื่นชอบศิลปินฝั่ง "{gender.upper()}"
+        Input: เพื่อนแฟนคลับชื่อ "{name}" เมนฝั่ง "{gender.upper()}"
 
-        Task: เขียนข้อความอวยพรสุดพิเศษ โดยมีองค์ประกอบดังนี้:
-        1. **การต้อนรับ:** ขอบคุณที่มาเป็นส่วนหนึ่งในความทรงจำครั้งสำคัญนี้
-        2. **ความรู้สึก:** บรรยายถึงพลังงานดีๆ ความสุข หรือรอยยิ้มที่พวกเขาจะได้รับกลับไป
-        3. **คำอวยพร:** ขอให้วันนี้เป็นวันที่ดีที่สุด การเดินทางปลอดภัย และสุขภาพแข็งแรง
-        4. **ปิดท้าย (Quote):** ขอ 1 ประโยคสั้นๆ (ภาษาอังกฤษ) ที่มีความหมายดีๆ เกี่ยวกับ Music, Love หรือ Happiness ปิดท้ายบรรทัดล่างสุด
+        Task: เขียนข้อความขอบคุณที่มาร่วมสนุกกับโปรเจกต์เล็กๆ ของเรา:
+        1. **ทักทาย:** ขอบคุณที่แวะมาเล่นกิจกรรม Fan Project ของเรานะ
+        2. **ความเชื่อมโยง:** ดีใจที่เราได้มารักศิลปินคนเดียวกัน และได้เจอกันในงาน Riser Concert นี้
+        3. **อวยพร:** ขอให้วันนี้เป็นวันที่ใจฟู ได้โมเมนต์กลับไปเยอะๆ และเดินทางกลับบ้านปลอดภัย
+        4. **ปิดท้าย:** Quote ภาษาอังกฤษสั้นๆ เกี่ยวกับ Music หรือ Happiness 1 ประโยค
 
-        *ไม่ต้องใส่หัวข้อ ให้เขียนเป็นย่อหน้าต่อเนื่องกันสวยงาม*
+        *ไม่ต้องใส่หัวข้อ เขียนเป็นย่อหน้าน่ารักๆ ต่อกันเลย*
         """
 
+        # --- PROMPT ภาษาอังกฤษ (Fan Project Ver.) ---
         prompt_en = f"""
-        Role: You are the "Happiness Ambassador" of Riser Concert, writing thank-you notes to fans.
-        Tone: Warm, sincere, polite, respectful, and full of positive energy.
-        Language: Beautiful, touching English (Length: about 4-5 sentences).
+        Role: You are a representative from the "Fan Project (@Jaiidees)", created with love by fans for fans.
+        Tone: Warm, soft, friendly (Fan-to-Fan connection), sweet, and not corporate/official.
+        Language: Heartwarming English (Length: 3-4 sentences).
 
-        Input: Fan named "{name}" who supports the "{gender.upper()}" artist side.
+        Input: Fellow fan named "{name}" supporting the "{gender.upper()}" side.
 
-        Task: Write an exclusive blessing message with these elements:
-        1. **Welcome:** Thank them deeply for being part of this historic memory.
-        2. **Feeling:** Describe the positive energy, joy, and smiles they will take home.
-        3. **Blessing:** Wish them the best day, safe travels, and good health.
-        4. **Closing Quote:** A short, meaningful quote about Music, Love, or Happiness at the very bottom.
+        Task: Write a thank you note for joining our small project:
+        1. **Greeting:** Thanks for stopping by to play our Fan Project gacha.
+        2. **Connection:** So happy we share the same love for the artist at Riser Concert.
+        3. **Wish:** Hope your heart is full of joy today, wishing you the best moments and safe travels home.
+        4. **Closing:** A short English Quote about Music or Happiness.
 
-        *Do not use headers. Write as a beautiful continuous paragraph.*
+        *No headers. Just a beautiful, continuous paragraph.*
         """
 
         final_prompt = prompt_en if lang == 'en' else prompt_th
 
-        # ✅ เรียกใช้ AI ด้วย SDK ใหม่ (Client.aio.models.generate_content)
         response = await client_ai.aio.models.generate_content(
             model=AI_MODEL_NAME,
             contents=final_prompt,
             config=types.GenerateContentConfig(
-                temperature=0.7, # เพิ่มความสร้างสรรค์
+                temperature=0.8, # เพิ่มความ Creative ให้ดูมีชีวิตชีวา
             )
         )
         return response.text.strip()
 
     except Exception as e:
         print(f"🔥 AI Error ({AI_MODEL_NAME}): {e}")
-        # Fallback กรณีโมเดลใหม่ยังไม่รองรับ หรือ Key มีปัญหา
         return error_msg_en if lang == 'en' else error_msg_th
 
 # --- 4. Routes ---
