@@ -17,7 +17,7 @@ FROM python:3.9-slim
 WORKDIR /app
 
 # Install System Dependencies (สำหรับจัดการรูปภาพ)
-RUN apt-get update && apt-get install -y libgl1-mesa-glx
+RUN apt-get update && apt-get install -y libgl1
 
 # Install Python Dependencies
 COPY backend/requirements.txt .
