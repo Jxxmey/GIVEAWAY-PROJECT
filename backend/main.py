@@ -3,10 +3,11 @@ import random
 import hashlib
 import asyncio
 import httpx
-from math import ceil # ✅ เพิ่ม import math
+from math import ceil
 from datetime import datetime
+from bson import ObjectId
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pymongo import MongoClient
@@ -40,6 +41,7 @@ try:
     db = client_db['riser_gacha']
     players = db['players']
     settings = db['settings']
+    messages = db['messages'] # ✅ เพิ่ม Collection ข้อความ
     players.create_index("ip_hash", unique=True)
     
     if not settings.find_one({"key": "system_status"}):
@@ -175,7 +177,7 @@ async def toggle_system(request: Request):
     settings.update_one({"key": "system_status"}, {"$set": {"is_active": new_status}})
     return {"is_active": new_status}
 
-# ✅ API ประวัติแบบแบ่งหน้า (Pagination)
+# ✅ API History (Pagination)
 @app.get("/api/admin/history")
 async def get_history(request: Request, page: int = 1, limit: int = 100):
     auth_header = request.headers.get("X-Admin-Key")
@@ -202,7 +204,7 @@ async def get_history(request: Request, page: int = 1, limit: int = 100):
     except Exception as e:
         raise HTTPException(500, str(e))
 
-# ✅ API สำหรับ Export ข้อมูลทั้งหมด (ไม่จำกัดหน้า)
+# ✅ API Export All
 @app.get("/api/admin/export")
 async def get_export_data(request: Request):
     auth_header = request.headers.get("X-Admin-Key")
@@ -210,10 +212,53 @@ async def get_export_data(request: Request):
         raise HTTPException(401, "Unauthorized")
 
     try:
-        # ดึงข้อมูลทั้งหมด
         cursor = players.find({}, {"_id": 0}).sort("played_at", -1)
         logs = list(cursor)
         return {"status": "success", "data": logs}
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+# ✅ API รับข้อความจาก User (Contact Us)
+@app.post("/api/contact")
+async def contact_us(request: Request):
+    try:
+        data = await request.json()
+        message_doc = {
+            "name": data.get("name", "Anonymous"),
+            "message": data.get("message", ""),
+            "contact": data.get("contact", ""),
+            "created_at": datetime.now(),
+            "ip_address": request.headers.get("X-Forwarded-For") or request.client.host
+        }
+        messages.insert_one(message_doc)
+        return {"status": "success"}
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+# ✅ API ดึงข้อความให้ Admin
+@app.get("/api/admin/messages")
+async def get_messages(request: Request):
+    auth_header = request.headers.get("X-Admin-Key")
+    if auth_header != ADMIN_SECRET:
+        raise HTTPException(401, "Unauthorized")
+    try:
+        cursor = messages.find({}).sort("created_at", -1).limit(200)
+        msgs = []
+        for m in cursor:
+            m["_id"] = str(m["_id"]) # Convert ObjectId to string
+            msgs.append(m)
+        return {"status": "success", "data": msgs}
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+@app.delete("/api/admin/messages/{msg_id}")
+async def delete_message(msg_id: str, request: Request):
+    auth_header = request.headers.get("X-Admin-Key")
+    if auth_header != ADMIN_SECRET:
+        raise HTTPException(401, "Unauthorized")
+    try:
+        messages.delete_one({"_id": ObjectId(msg_id)})
+        return {"status": "deleted"}
     except Exception as e:
         raise HTTPException(500, str(e))
 

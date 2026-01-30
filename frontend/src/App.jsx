@@ -2,7 +2,7 @@ import { useState } from 'react'
 import Admin from './Admin'
 import NotFound from './NotFound'
 import './App.css'
-import { Sparkles, Share2, Download, User, Music, Info, CheckCircle2, Heart, Maximize2, X, Twitter, Gift, Globe } from 'lucide-react'
+import { Sparkles, Share2, Download, User, Music, Info, CheckCircle2, Heart, Maximize2, X, Twitter, Gift, Globe, MessageCircle, Send } from 'lucide-react'
 import confetti from 'canvas-confetti'
 
 // --- TRANSLATION DICTIONARY ---
@@ -38,7 +38,12 @@ const TRANSLATIONS = {
     alert_closed: "⛔ กิจกรรมยังไม่เปิดให้ร่วมสนุก\n\nกรุณารอประกาศอย่างเป็นทางการจาก @Jaiidees เร็วๆ นี้ครับ!",
     share_alert_success: "✅ ระบบคัดลอกรูปให้แล้ว!\n\nเมื่อหน้า X (Twitter) เด้งขึ้นมา\nให้กด 'วาง' (Paste) หรือ Ctrl+V เพื่อใส่รูปได้เลยครับ",
     share_alert_fail: "📸 อย่าลืมแนบรูปที่ Save ไว้ไปอวดเพื่อนๆ ด้วยนะครับ!",
-    share_text: "สุ่มกาชา Riser Concert ได้รูปสวยมาก! 🔮✨\n\nมาเล่นกันที่ Fan Project by @Jaiidees\n\n#RiserConcert #JaiideesGiveaway"
+    share_text: "สุ่มกาชา Riser Concert ได้รูปสวยมาก! 🔮✨\n\nมาเล่นกันที่ Fan Project by @Jaiidees\n\n#RiserConcert #JaiideesGiveaway",
+    chat_title: "ติดต่อ Admin / ฝากข้อความ",
+    chat_placeholder: "พิมพ์ข้อความที่นี่...",
+    chat_contact: "ช่องทางติดต่อกลับ (ถ้ามี)",
+    chat_send: "ส่งข้อความ",
+    chat_success: "ส่งข้อความเรียบร้อยครับ! เดี๋ยวแอดมินมาอ่านนะ ❤️"
   },
   en: {
     subtitle: "Fan Project by @Jaiidees",
@@ -71,7 +76,12 @@ const TRANSLATIONS = {
     alert_closed: "⛔ The event has not started yet.\n\nPlease wait for the official announcement from @Jaiidees coming soon!",
     share_alert_success: "✅ Image copied to clipboard!\n\nPlease Paste (Ctrl+V) the image when the X (Twitter) window opens.",
     share_alert_fail: "📸 Don't forget to attach your saved image to show off!",
-    share_text: "Got this amazing wallpaper from Riser Concert Gacha! 🔮✨\n\nPlay now at Fan Project by @Jaiidees\n\n#RiserConcert #JaiideesGiveaway"
+    share_text: "Got this amazing wallpaper from Riser Concert Gacha! 🔮✨\n\nPlay now at Fan Project by @Jaiidees\n\n#RiserConcert #JaiideesGiveaway",
+    chat_title: "Contact Admin / Leave a message",
+    chat_placeholder: "Type your message...",
+    chat_contact: "Contact info (optional)",
+    chat_send: "Send Message",
+    chat_success: "Message sent! Admin will check it soon ❤️"
   }
 }
 
@@ -93,6 +103,11 @@ function App() {
   const [result, setResult] = useState(null)
   const [loadingText, setLoadingText] = useState('Initializing...')
   const [showExample, setShowExample] = useState(false)
+  
+  // Chat State
+  const [showChat, setShowChat] = useState(false)
+  const [chatMsg, setChatMsg] = useState('')
+  const [chatContact, setChatContact] = useState('')
 
   const toggleLang = () => {
     setLang(prev => prev === 'th' ? 'en' : 'th')
@@ -120,7 +135,6 @@ function App() {
       const res = await fetch('/api/play', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        // ✅ เพิ่ม lang ลงไปใน Body
         body: JSON.stringify({ ...formData, lang: lang }) 
       })
       const data = await res.json()
@@ -149,6 +163,27 @@ function App() {
       clearInterval(interval)
       alert("Server connection failed.")
       setStep('landing')
+    }
+  }
+
+  const handleSendChat = async () => {
+    if (!chatMsg.trim()) return;
+    try {
+        await fetch('/api/contact', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                message: chatMsg, 
+                contact: chatContact,
+                name: formData.name || "Visitor" 
+            })
+        })
+        alert(t.chat_success)
+        setChatMsg('')
+        setChatContact('')
+        setShowChat(false)
+    } catch (e) {
+        alert("Error sending message")
     }
   }
 
@@ -394,6 +429,46 @@ function App() {
           </div>
         )}
       </main>
+
+      {/* CHAT FAB */}
+      <div className="fixed bottom-4 right-4 z-[60]">
+        {!showChat ? (
+          <button 
+            onClick={() => setShowChat(true)}
+            className="w-12 h-12 bg-gradient-to-tr from-pink-500 to-purple-500 rounded-full flex items-center justify-center text-white shadow-lg hover:scale-110 transition-transform"
+          >
+            <MessageCircle size={24} />
+          </button>
+        ) : (
+            <div className="bg-white rounded-2xl shadow-2xl w-72 border border-slate-200 overflow-hidden animate-zoom-in">
+                <div className="bg-slate-100 p-3 border-b border-slate-200 flex justify-between items-center">
+                    <span className="text-xs font-bold text-slate-700">{t.chat_title}</span>
+                    <button onClick={() => setShowChat(false)} className="text-slate-400 hover:text-slate-600"><X size={16} /></button>
+                </div>
+                <div className="p-3 space-y-3">
+                    <textarea 
+                        className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs focus:outline-none focus:border-pink-400 resize-none h-20"
+                        placeholder={t.chat_placeholder}
+                        value={chatMsg}
+                        onChange={(e) => setChatMsg(e.target.value)}
+                    ></textarea>
+                    <input 
+                        type="text" 
+                        placeholder={t.chat_contact}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs focus:outline-none focus:border-pink-400"
+                        value={chatContact}
+                        onChange={(e) => setChatContact(e.target.value)}
+                    />
+                    <button 
+                        onClick={handleSendChat}
+                        className="w-full bg-slate-900 text-white py-2 rounded-lg text-xs font-bold hover:bg-slate-700 flex items-center justify-center gap-2"
+                    >
+                        <Send size={12} /> {t.chat_send}
+                    </button>
+                </div>
+            </div>
+        )}
+      </div>
 
       {/* Example Modal */}
       {showExample && (
