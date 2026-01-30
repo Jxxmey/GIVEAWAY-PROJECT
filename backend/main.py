@@ -7,7 +7,7 @@ from math import ceil
 from datetime import datetime
 from bson import ObjectId
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pymongo import MongoClient
@@ -21,13 +21,14 @@ load_dotenv()
 
 app = FastAPI()
 
-# Config
+# Config Variables
 MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017")
 GEMINI_KEY = os.getenv("GEMINI_API_KEY")
 ADMIN_SECRET = os.getenv("ADMIN_SECRET", "my_super_secret")
 SELF_URL = os.getenv("RENDER_EXTERNAL_URL", "http://127.0.0.1:8000")
 AI_MODEL_NAME = os.getenv("AI_MODEL_NAME", "gemini-flash-latest")
 
+# Middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -35,15 +36,19 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Database
+# Database Setup
 try:
     client_db = MongoClient(MONGO_URI)
     db = client_db['riser_gacha']
     players = db['players']
     settings = db['settings']
-    messages = db['messages'] # ✅ เพิ่ม Collection ข้อความ
-    players.create_index("ip_hash", unique=True)
+    chats = db['chats'] # ✅ Collection ใหม่สำหรับเก็บห้องแชท
     
+    # Create Indexes
+    players.create_index("ip_hash", unique=True)
+    chats.create_index("session_id", unique=True)
+    
+    # Initialize Settings
     if not settings.find_one({"key": "system_status"}):
         settings.insert_one({"key": "system_status", "is_active": False})
         print("🔒 System initialized as CLOSED")
@@ -61,10 +66,11 @@ if GEMINI_KEY:
     except Exception as e:
         print(f"❌ Gemini Client Error: {e}")
 
+# Directories
 IMAGE_DIR = "/app/processed_images"
 STATIC_DIR = "/app/static"
 
-# --- Backup Messages ---
+# --- Backup Messages (Fallback) ---
 BACKUP_MESSAGES_TH = [
     "ขอบคุณที่มาร่วมสนุกกับโปรเจกต์เล็กๆ ของเรานะ! ดีใจที่ได้เจอกันในงาน Riser Concert ขอให้วันนี้เป็นวันที่ใจฟู ได้โมเมนต์กลับไปเยอะๆ และเดินทางกลับบ้านปลอดภัยนะ\n\n\"Music is the strongest form of magic.\"",
     "ฮัลโหลลล! ขอบคุณที่แวะมาเล่นกิจกรรม Fan Project นะคะ ดีใจมากที่เราชอบศิลปินคนเดียวกัน ขอให้วันนี้มีความสุขสุดๆ เก็บความทรงจำดีๆ กลับไปให้เต็มกระเป๋าเลย!\n\n\"Where words fail, music speaks.\"",
@@ -88,13 +94,14 @@ async def health_check():
     return {"status": "alive", "timestamp": datetime.now()}
 
 async def keep_alive_ping():
+    """Ping own server every 5 mins to prevent sleeping"""
     await asyncio.sleep(10)
     print(f"🚀 Self-Ping system started. URL: {SELF_URL}/api/health")
     async with httpx.AsyncClient() as client:
         while True:
             try:
                 response = await client.get(f"{SELF_URL}/api/health", timeout=10)
-                print(f"💓 Self-Ping success: {response.status_code}")
+                # print(f"💓 Self-Ping success: {response.status_code}")
             except Exception as e:
                 print(f"⚠️ Self-Ping failed: {e}")
             await asyncio.sleep(300)
@@ -130,18 +137,20 @@ async def generate_blessing(name: str, gender: str, lang: str):
     try:
         prompt_th = f"""
         Role: คุณคือตัวแทนจาก "โปรเจกต์แฟนคลับ (@Jaiidees)" ที่ทำกิจกรรมแจกของที่ระลึกด้วยใจรัก
-        Tone: อบอุ่น, ละมุน, เป็นกันเอง (เหมือนเพื่อนคุยกับเพื่อน), น่ารัก, ให้เกียรติ แต่ไม่ทางการ (Not Official)
+        Tone: อบอุ่น, ละมุน, เป็นกันเอง, น่ารัก, ให้เกียรติ แต่ไม่ทางการ
         Language: ภาษาไทยที่อ่านแล้วยิ้มตาม (ความยาว 3-4 บรรทัด)
         Input: เพื่อนแฟนคลับชื่อ "{name}" เมนฝั่ง "{gender.upper()}"
         Task: เขียนข้อความขอบคุณที่มาร่วมสนุกกับโปรเจกต์แฟนคลับ: 1.ทักทาย 2.ความเชื่อมโยงที่รักศิลปินเหมือนกัน 3.อวยพรให้ใจฟูและเดินทางปลอดภัย 4.ปิดท้าย Quote ภาษาอังกฤษสั้นๆ
         """
+        
         prompt_en = f"""
         Role: You are a representative from the "Fan Project (@Jaiidees)", created with love by fans for fans.
-        Tone: Warm, soft, friendly (Fan-to-Fan connection), sweet, and not corporate/official.
+        Tone: Warm, soft, friendly, sweet, and not corporate/official.
         Language: Heartwarming English (Length: 3-4 sentences).
         Input: Fellow fan named "{name}" supporting the "{gender.upper()}" side.
         Task: Write a thank you note for joining our fan project gacha. Express joy in sharing the same love for the artist. Wish them joy and safe travels. End with a short English Quote.
         """
+        
         final_prompt = prompt_en if lang == 'en' else prompt_th
 
         response = await asyncio.wait_for(
@@ -154,10 +163,126 @@ async def generate_blessing(name: str, gender: str, lang: str):
         )
         return response.text.strip()
     except Exception as e:
-        print(f"🔥 AI Error ({AI_MODEL_NAME}): {e} -> Using Manual Backup")
+        print(f"🔥 AI Error: {e} -> Using Manual Backup")
         return random.choice(backup_list)
 
-# --- 4. Routes ---
+# --- 4. Chat System Routes (NEW) ---
+
+@app.post("/api/chat/send")
+async def send_chat(request: Request):
+    try:
+        data = await request.json()
+        session_id = data.get("session_id")
+        message = data.get("message")
+        name = data.get("name", "Fan")
+        
+        if not session_id or not message:
+            raise HTTPException(400, "Missing data")
+
+        # Prepare new message
+        new_msg = {
+            "sender": "user",
+            "text": message,
+            "timestamp": datetime.now()
+        }
+
+        # Check if chat exists
+        chat_room = chats.find_one({"session_id": session_id})
+
+        if chat_room:
+            # Update existing chat
+            chats.update_one(
+                {"session_id": session_id}, 
+                {
+                    "$push": {"messages": new_msg},
+                    "$set": {
+                        "last_updated": datetime.now(), 
+                        "is_read": False, 
+                        "name": name
+                    }
+                }
+            )
+        else:
+            # Create new chat
+            chats.insert_one({
+                "session_id": session_id,
+                "name": name,
+                "created_at": datetime.now(),
+                "last_updated": datetime.now(),
+                "is_read": False,
+                "messages": [new_msg]
+            })
+            
+        return {"status": "success"}
+    except Exception as e:
+        print(f"Chat Error: {e}")
+        raise HTTPException(500, str(e))
+
+@app.get("/api/chat/history/{session_id}")
+async def get_chat_history(session_id: str):
+    """API for User to poll chat history"""
+    chat = chats.find_one({"session_id": session_id}, {"_id": 0})
+    if chat:
+        return {"status": "success", "data": chat["messages"]}
+    return {"status": "empty", "data": []}
+
+@app.post("/api/admin/reply")
+async def admin_reply(request: Request):
+    """API for Admin to reply"""
+    auth_header = request.headers.get("X-Admin-Key")
+    if auth_header != ADMIN_SECRET:
+        raise HTTPException(401, "Unauthorized")
+    
+    try:
+        data = await request.json()
+        session_id = data.get("session_id")
+        message = data.get("message")
+        
+        chats.update_one(
+            {"session_id": session_id},
+            {
+                "$push": {
+                    "messages": {
+                        "sender": "admin",
+                        "text": message,
+                        "timestamp": datetime.now()
+                    }
+                },
+                "$set": {"is_read": True}
+            }
+        )
+        return {"status": "success"}
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+@app.get("/api/admin/chats")
+async def get_all_chats(request: Request):
+    """API for Admin to list all chats"""
+    auth_header = request.headers.get("X-Admin-Key")
+    if auth_header != ADMIN_SECRET:
+        raise HTTPException(401, "Unauthorized")
+    
+    try:
+        # Get chats sorted by last update
+        cursor = chats.find({}).sort("last_updated", -1).limit(50)
+        chat_list = []
+        for c in cursor:
+            c["_id"] = str(c["_id"])
+            last_msg = c["messages"][-1]["text"] if c["messages"] else ""
+            
+            chat_list.append({
+                "session_id": c["session_id"],
+                "name": c["name"],
+                "last_message": last_msg,
+                "last_updated": c["last_updated"],
+                "is_read": c.get("is_read", True),
+                "messages": c["messages"]
+            })
+        return {"status": "success", "data": chat_list}
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+# --- 5. Main Game & Admin Routes ---
 
 @app.get("/api/admin/system_status")
 async def get_system_status(request: Request):
@@ -177,7 +302,6 @@ async def toggle_system(request: Request):
     settings.update_one({"key": "system_status"}, {"$set": {"is_active": new_status}})
     return {"is_active": new_status}
 
-# ✅ API History (Pagination)
 @app.get("/api/admin/history")
 async def get_history(request: Request, page: int = 1, limit: int = 100):
     auth_header = request.headers.get("X-Admin-Key")
@@ -204,7 +328,6 @@ async def get_history(request: Request, page: int = 1, limit: int = 100):
     except Exception as e:
         raise HTTPException(500, str(e))
 
-# ✅ API Export All
 @app.get("/api/admin/export")
 async def get_export_data(request: Request):
     auth_header = request.headers.get("X-Admin-Key")
@@ -215,50 +338,6 @@ async def get_export_data(request: Request):
         cursor = players.find({}, {"_id": 0}).sort("played_at", -1)
         logs = list(cursor)
         return {"status": "success", "data": logs}
-    except Exception as e:
-        raise HTTPException(500, str(e))
-
-# ✅ API รับข้อความจาก User (Contact Us)
-@app.post("/api/contact")
-async def contact_us(request: Request):
-    try:
-        data = await request.json()
-        message_doc = {
-            "name": data.get("name", "Anonymous"),
-            "message": data.get("message", ""),
-            "contact": data.get("contact", ""),
-            "created_at": datetime.now(),
-            "ip_address": request.headers.get("X-Forwarded-For") or request.client.host
-        }
-        messages.insert_one(message_doc)
-        return {"status": "success"}
-    except Exception as e:
-        raise HTTPException(500, str(e))
-
-# ✅ API ดึงข้อความให้ Admin
-@app.get("/api/admin/messages")
-async def get_messages(request: Request):
-    auth_header = request.headers.get("X-Admin-Key")
-    if auth_header != ADMIN_SECRET:
-        raise HTTPException(401, "Unauthorized")
-    try:
-        cursor = messages.find({}).sort("created_at", -1).limit(200)
-        msgs = []
-        for m in cursor:
-            m["_id"] = str(m["_id"]) # Convert ObjectId to string
-            msgs.append(m)
-        return {"status": "success", "data": msgs}
-    except Exception as e:
-        raise HTTPException(500, str(e))
-
-@app.delete("/api/admin/messages/{msg_id}")
-async def delete_message(msg_id: str, request: Request):
-    auth_header = request.headers.get("X-Admin-Key")
-    if auth_header != ADMIN_SECRET:
-        raise HTTPException(401, "Unauthorized")
-    try:
-        messages.delete_one({"_id": ObjectId(msg_id)})
-        return {"status": "deleted"}
     except Exception as e:
         raise HTTPException(500, str(e))
 
@@ -274,11 +353,12 @@ async def play_gacha(request: Request):
         name = data.get("name", "Fan")
         lang = data.get("lang", "th")
         
+        # IP Checking
         client_ip = request.headers.get("X-Forwarded-For") or request.client.host
         if "," in client_ip: client_ip = client_ip.split(",")[0].strip()
-        
         ip_hash = get_ip_hash(client_ip)
 
+        # Check Duplicate
         if players.find_one({"ip_hash": ip_hash}):
             old = players.find_one({"ip_hash": ip_hash})
             return {
@@ -292,6 +372,7 @@ async def play_gacha(request: Request):
         selected_image = get_random_image(gender)
         blessing = await generate_blessing(name, gender, lang)
 
+        # Insert Record
         players.insert_one({
             "ip_hash": ip_hash,
             "ip_address": client_ip, 
@@ -332,7 +413,7 @@ async def delete_history(ip_hash: str, request: Request):
         return {"status": "deleted"}
     raise HTTPException(404, "Record not found")
 
-# --- Frontend Serve ---
+# --- Frontend Serving ---
 if os.path.exists(os.path.join(STATIC_DIR, "assets")):
     app.mount("/assets", StaticFiles(directory=os.path.join(STATIC_DIR, "assets")), name="static")
 
