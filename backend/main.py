@@ -2,8 +2,7 @@ import os
 import random
 import hashlib
 import asyncio
-import requests # เก็บไว้เผื่อใช้ส่วนอื่นที่ไม่ใช่ async
-import httpx    # ✅ เพิ่ม httpx สำหรับ Async Ping
+import httpx # ใช้ httpx ตามที่คุยกันก่อนหน้านี้
 from datetime import datetime
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse
@@ -12,9 +11,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from pymongo import MongoClient
 from google import genai
 from google.genai import types
-
-# ✅ เพิ่มการโหลด .env (ถ้ามีไฟล์นี้)
 from dotenv import load_dotenv
+
 load_dotenv()
 
 # --- 1. Configuration & Setup ---
@@ -26,9 +24,7 @@ MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017")
 GEMINI_KEY = os.getenv("GEMINI_API_KEY")
 ADMIN_SECRET = os.getenv("ADMIN_SECRET", "my_super_secret")
 SELF_URL = os.getenv("RENDER_EXTERNAL_URL", "http://127.0.0.1:8000")
-
-# ✅ แนะนำให้เปลี่ยน Default Model เป็นชื่อที่แน่นอน
-AI_MODEL_NAME = os.getenv("AI_MODEL_NAME", "gemini-flash-latest") 
+AI_MODEL_NAME = os.getenv("AI_MODEL_NAME", "gemini-flash-latest") # ใช้ชื่อรุ่นที่เสถียร
 
 app.add_middleware(
     CORSMiddleware,
@@ -37,7 +33,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ... (ส่วน Database และ AI Setup เหมือนเดิม) ...
 # Database
 try:
     client_db = MongoClient(MONGO_URI)
@@ -66,35 +61,45 @@ if GEMINI_KEY:
 IMAGE_DIR = "/app/processed_images"
 STATIC_DIR = "/app/static"
 
-# --- 2. Background Tasks (Updated) ---
+# --- ✅ Manual Backup Messages (ข้อความสำรอง) ---
+# เตรียมไว้หลายๆ แบบ เพื่อให้สุ่มแล้วไม่ซ้ำซาก
+BACKUP_MESSAGES_TH = [
+    "ขอบคุณที่มาร่วมสนุกกับโปรเจกต์เล็กๆ ของเรานะ! ดีใจที่ได้เจอกันในงาน Riser Concert ขอให้วันนี้เป็นวันที่ใจฟู ได้โมเมนต์กลับไปเยอะๆ และเดินทางกลับบ้านปลอดภัยนะ\n\n\"Music is the strongest form of magic.\"",
+    "ฮัลโหลลล! ขอบคุณที่แวะมาเล่นกิจกรรม Fan Project นะคะ ดีใจมากที่เราชอบศิลปินคนเดียวกัน ขอให้วันนี้มีความสุขสุดๆ เก็บความทรงจำดีๆ กลับไปให้เต็มกระเป๋าเลย!\n\n\"Where words fail, music speaks.\"",
+    "ยินดีต้อนรับสู่โปรเจกต์แฟนคลับของเราครับ! ดีใจที่ได้เป็นส่วนหนึ่งในวันสำคัญนี้ ขอให้สนุกกับคอนเสิร์ต ร้องเพลงให้สุดเสียง และกลับบ้านอย่างมีความสุขนะครับ\n\n\"Happiness is seeing your favorite artist live.\"",
+    "ขอบคุณที่มาร่วมเป็นส่วนหนึ่งของความทรงจำนี้นะ! หวังว่าของขวัญเล็กๆ นี้จะทำให้เธอยิ้มได้ ขอให้วันนี้เป็นวันที่สดใสและเต็มไปด้วยพลังบวกนะ เดินทางปลอดภัยจ้า\n\n\"Life is short, buy the concert tickets.\"",
+    "งู้ยยย ขอบคุณที่มาเล่นด้วยกันน้า! ดีใจที่ได้เจอคนรักศิลปินเหมือนกัน ขอให้วันนี้ได้รับพลังงานดีๆ กลับไปเต็มเปี่ยม ดูแลสุขภาพและเดินทางกลับดีๆ นะคะ\n\n\"Music binds our souls, hearts, and emotions.\""
+]
+
+BACKUP_MESSAGES_EN = [
+    "Thanks for stopping by our Fan Project gacha! So happy we share the same love for the artist at Riser Concert. Hope your heart is full of joy today. Safe travels home!\n\n\"Music is the strongest form of magic.\"",
+    "Hello fellow fan! Thank you for joining our small project. Wishing you the best moments and a wonderful time at the concert. Have a safe trip back!\n\n\"Where words fail, music speaks.\"",
+    "Welcome to our Fan Project! It's amazing to see you here. Hope this little gift brings a smile to your face. Enjoy the music and have a safe journey!\n\n\"Happiness is seeing your favorite artist live.\"",
+    "So glad you are here! Thank you for supporting our project. May your day be filled with happiness and great memories. Take care and stay safe!\n\n\"Life is short, buy the concert tickets.\"",
+    "Thank you for being part of this memory! Sending you lots of love and positive energy. Hope you have an incredible time today. Safe travels!\n\n\"Music binds our souls, hearts, and emotions.\""
+]
+
+# --- 2. Background Tasks ---
 
 @app.get("/health")
 async def health_check():
     return {"status": "alive", "timestamp": datetime.now()}
 
 async def keep_alive_ping():
-    """
-    Ping ตัวเองทุก 5 นาที (แบบ Async เพื่อไม่ให้บล็อกการทำงานหลัก)
-    """
-    await asyncio.sleep(10) 
+    await asyncio.sleep(10)
     print(f"🚀 Self-Ping system started. URL: {SELF_URL}/health")
-    
-    async with httpx.AsyncClient() as client: # ✅ ใช้ httpx แทน requests
+    async with httpx.AsyncClient() as client:
         while True:
             try:
                 response = await client.get(f"{SELF_URL}/health", timeout=10)
                 print(f"💓 Self-Ping success: {response.status_code}")
             except Exception as e:
                 print(f"⚠️ Self-Ping failed: {e}")
-            
             await asyncio.sleep(300)
 
 @app.on_event("startup")
 async def startup_event():
     asyncio.create_task(keep_alive_ping())
-
-# ... (ส่วน Helpers, Routes และ Logic อื่นๆ เหมือนเดิมทุกประการ) ...
-# (ส่วนล่างตั้งแต่ def get_ip_hash ลงไปไม่ต้องแก้ครับ ใช้ของเดิมได้เลย)
 
 # --- 3. Helpers ---
 
@@ -115,22 +120,24 @@ def get_random_image(gender: str):
         raise HTTPException(500, "No images found")
     return random.choice(files)
 
-# ✅ ฟังก์ชัน AI (Fan Project Tone)
+# ✅ ฟังก์ชัน AI (พร้อมระบบ Manual Fallback)
 async def generate_blessing(name: str, gender: str, lang: str):
-    error_msg_th = "ตอนนี้คนเล่นเยอะมาก ระบบขอพักจิบน้ำแป๊บ (AI Error) ลองกดใหม่นะเตง!"
-    error_msg_en = "Too many fans joining! System needs a quick break (AI Error). Please try again!"
+    # เลือกชุดข้อความสำรองตามภาษา
+    backup_list = BACKUP_MESSAGES_EN if lang == 'en' else BACKUP_MESSAGES_TH
     
+    # ถ้าไม่มี Client AI ให้ใช้สำรองทันที
     if not client_ai:
-        return error_msg_en if lang == 'en' else error_msg_th
+        print("⚠️ No AI Client -> Using Manual Backup")
+        return random.choice(backup_list)
     
     try:
-        # --- PROMPT ภาษาไทย (ฉบับแฟนคลับ) ---
+        # Prompt ภาษาไทย (ฉบับแฟนคลับ)
         prompt_th = f"""
         Role: คุณคือตัวแทนจาก "โปรเจกต์แฟนคลับ (@Jaiidees)" ที่ทำกิจกรรมแจกของที่ระลึกด้วยใจรัก
         Tone: อบอุ่น, ละมุน, เป็นกันเอง (เหมือนเพื่อนคุยกับเพื่อน), น่ารัก, ให้เกียรติ แต่ไม่ทางการ (Not Official)
         Language: ภาษาไทยที่อ่านแล้วยิ้มตาม (ความยาว 3-4 บรรทัด)
 
-        Input: เพื่อนแฟนคลับชื่อ "{name}" เมนฝั่ง "{gender.upper()}"
+        Input: เพื่อนแฟนคลับชื่อ "{name}"
 
         Task: เขียนข้อความขอบคุณที่มาร่วมสนุกกับโปรเจกต์เล็กๆ ของเรา:
         1. **ทักทาย:** ขอบคุณที่แวะมาเล่นกิจกรรม Fan Project ของเรานะ
@@ -141,7 +148,7 @@ async def generate_blessing(name: str, gender: str, lang: str):
         *ไม่ต้องใส่หัวข้อ เขียนเป็นย่อหน้าน่ารักๆ ต่อกันเลย*
         """
 
-        # --- PROMPT ภาษาอังกฤษ (Fan Project Ver.) ---
+        # Prompt ภาษาอังกฤษ (Fan Project Ver.)
         prompt_en = f"""
         Role: You are a representative from the "Fan Project (@Jaiidees)", created with love by fans for fans.
         Tone: Warm, soft, friendly (Fan-to-Fan connection), sweet, and not corporate/official.
@@ -160,18 +167,27 @@ async def generate_blessing(name: str, gender: str, lang: str):
 
         final_prompt = prompt_en if lang == 'en' else prompt_th
 
-        response = await client_ai.aio.models.generate_content(
-            model=AI_MODEL_NAME,
-            contents=final_prompt,
-            config=types.GenerateContentConfig(
-                temperature=0.8, # เพิ่มความ Creative ให้ดูมีชีวิตชีวา
-            )
+        # เรียก AI พร้อม Timeout 5 วินาที (ถ้าเกิน 5 วิ ตัดไปใช้ Backup เลย)
+        # ต้องใช้ asyncio.wait_for เพื่อคุมเวลา
+        response = await asyncio.wait_for(
+            client_ai.aio.models.generate_content(
+                model=AI_MODEL_NAME,
+                contents=final_prompt,
+                config=types.GenerateContentConfig(
+                    temperature=0.8,
+                )
+            ),
+            timeout=5.0 # ⏳ รอสูงสุดแค่ 5 วินาที
         )
         return response.text.strip()
 
+    except asyncio.TimeoutError:
+        print(f"⏰ AI Timeout (Over 5s) -> Using Manual Backup")
+        return random.choice(backup_list)
+        
     except Exception as e:
-        print(f"🔥 AI Error ({AI_MODEL_NAME}): {e}")
-        return error_msg_en if lang == 'en' else error_msg_th
+        print(f"🔥 AI Error ({AI_MODEL_NAME}): {e} -> Using Manual Backup")
+        return random.choice(backup_list)
 
 # --- 4. Routes ---
 
