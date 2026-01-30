@@ -2,7 +2,8 @@ import os
 import random
 import hashlib
 import asyncio
-import requests
+import requests # เก็บไว้เผื่อใช้ส่วนอื่นที่ไม่ใช่ async
+import httpx    # ✅ เพิ่ม httpx สำหรับ Async Ping
 from datetime import datetime
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse
@@ -11,6 +12,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from pymongo import MongoClient
 from google import genai
 from google.genai import types
+
+# ✅ เพิ่มการโหลด .env (ถ้ามีไฟล์นี้)
+from dotenv import load_dotenv
+load_dotenv()
 
 # --- 1. Configuration & Setup ---
 
@@ -22,8 +27,8 @@ GEMINI_KEY = os.getenv("GEMINI_API_KEY")
 ADMIN_SECRET = os.getenv("ADMIN_SECRET", "my_super_secret")
 SELF_URL = os.getenv("RENDER_EXTERNAL_URL", "http://127.0.0.1:8000")
 
-# ใช้ค่าจาก .env ถ้าไม่มีให้ใช้ gemini-2.0-flash-exp
-AI_MODEL_NAME = os.getenv("AI_MODEL_NAME", "gemini-flash-latest")
+# ✅ แนะนำให้เปลี่ยน Default Model เป็นชื่อที่แน่นอน
+AI_MODEL_NAME = os.getenv("AI_MODEL_NAME", "gemini-flash-latest") 
 
 app.add_middleware(
     CORSMiddleware,
@@ -32,6 +37,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# ... (ส่วน Database และ AI Setup เหมือนเดิม) ...
 # Database
 try:
     client_db = MongoClient(MONGO_URI)
@@ -60,24 +66,35 @@ if GEMINI_KEY:
 IMAGE_DIR = "/app/processed_images"
 STATIC_DIR = "/app/static"
 
-# --- 2. Background Tasks ---
+# --- 2. Background Tasks (Updated) ---
 
 @app.get("/health")
 async def health_check():
     return {"status": "alive", "timestamp": datetime.now()}
 
 async def keep_alive_ping():
-    while True:
-        await asyncio.sleep(300)
-        try:
-            response = requests.get(f"{SELF_URL}/health", timeout=10)
-            print(f"💓 Self-Ping success: {response.status_code}")
-        except Exception as e:
-            print(f"⚠️ Self-Ping failed: {e}")
+    """
+    Ping ตัวเองทุก 5 นาที (แบบ Async เพื่อไม่ให้บล็อกการทำงานหลัก)
+    """
+    await asyncio.sleep(10) 
+    print(f"🚀 Self-Ping system started. URL: {SELF_URL}/health")
+    
+    async with httpx.AsyncClient() as client: # ✅ ใช้ httpx แทน requests
+        while True:
+            try:
+                response = await client.get(f"{SELF_URL}/health", timeout=10)
+                print(f"💓 Self-Ping success: {response.status_code}")
+            except Exception as e:
+                print(f"⚠️ Self-Ping failed: {e}")
+            
+            await asyncio.sleep(300)
 
 @app.on_event("startup")
 async def startup_event():
     asyncio.create_task(keep_alive_ping())
+
+# ... (ส่วน Helpers, Routes และ Logic อื่นๆ เหมือนเดิมทุกประการ) ...
+# (ส่วนล่างตั้งแต่ def get_ip_hash ลงไปไม่ต้องแก้ครับ ใช้ของเดิมได้เลย)
 
 # --- 3. Helpers ---
 

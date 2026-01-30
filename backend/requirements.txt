@@ -5,3 +5,5 @@ google-genai
 python-multipart
 requests
 pillow
+httpx
+python-dotenv
