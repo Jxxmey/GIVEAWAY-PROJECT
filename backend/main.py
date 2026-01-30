@@ -2,7 +2,7 @@ import os
 import random
 import hashlib
 import asyncio
-import httpx # ใช้ httpx ตามที่คุยกันก่อนหน้านี้
+import httpx
 from datetime import datetime
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse
@@ -24,7 +24,7 @@ MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017")
 GEMINI_KEY = os.getenv("GEMINI_API_KEY")
 ADMIN_SECRET = os.getenv("ADMIN_SECRET", "my_super_secret")
 SELF_URL = os.getenv("RENDER_EXTERNAL_URL", "http://127.0.0.1:8000")
-AI_MODEL_NAME = os.getenv("AI_MODEL_NAME", "gemini-flash-latest") # ใช้ชื่อรุ่นที่เสถียร
+AI_MODEL_NAME = os.getenv("AI_MODEL_NAME", "gemini-flash-latest")
 
 app.add_middleware(
     CORSMiddleware,
@@ -61,8 +61,7 @@ if GEMINI_KEY:
 IMAGE_DIR = "/app/processed_images"
 STATIC_DIR = "/app/static"
 
-# --- ✅ Manual Backup Messages (ข้อความสำรอง) ---
-# เตรียมไว้หลายๆ แบบ เพื่อให้สุ่มแล้วไม่ซ้ำซาก
+# --- Backup Messages ---
 BACKUP_MESSAGES_TH = [
     "ขอบคุณที่มาร่วมสนุกกับโปรเจกต์เล็กๆ ของเรานะ! ดีใจที่ได้เจอกันในงาน Riser Concert ขอให้วันนี้เป็นวันที่ใจฟู ได้โมเมนต์กลับไปเยอะๆ และเดินทางกลับบ้านปลอดภัยนะ\n\n\"Music is the strongest form of magic.\"",
     "ฮัลโหลลล! ขอบคุณที่แวะมาเล่นกิจกรรม Fan Project นะคะ ดีใจมากที่เราชอบศิลปินคนเดียวกัน ขอให้วันนี้มีความสุขสุดๆ เก็บความทรงจำดีๆ กลับไปให้เต็มกระเป๋าเลย!\n\n\"Where words fail, music speaks.\"",
@@ -81,17 +80,17 @@ BACKUP_MESSAGES_EN = [
 
 # --- 2. Background Tasks ---
 
-@app.get("/health")
+@app.get("/api/health")
 async def health_check():
     return {"status": "alive", "timestamp": datetime.now()}
 
 async def keep_alive_ping():
     await asyncio.sleep(10)
-    print(f"🚀 Self-Ping system started. URL: {SELF_URL}/health")
+    print(f"🚀 Self-Ping system started. URL: {SELF_URL}/api/health")
     async with httpx.AsyncClient() as client:
         while True:
             try:
-                response = await client.get(f"{SELF_URL}/health", timeout=10)
+                response = await client.get(f"{SELF_URL}/api/health", timeout=10)
                 print(f"💓 Self-Ping success: {response.status_code}")
             except Exception as e:
                 print(f"⚠️ Self-Ping failed: {e}")
@@ -120,71 +119,37 @@ def get_random_image(gender: str):
         raise HTTPException(500, "No images found")
     return random.choice(files)
 
-# ✅ ฟังก์ชัน AI (พร้อมระบบ Manual Fallback)
 async def generate_blessing(name: str, gender: str, lang: str):
-    # เลือกชุดข้อความสำรองตามภาษา
     backup_list = BACKUP_MESSAGES_EN if lang == 'en' else BACKUP_MESSAGES_TH
-    
-    # ถ้าไม่มี Client AI ให้ใช้สำรองทันที
     if not client_ai:
-        print("⚠️ No AI Client -> Using Manual Backup")
         return random.choice(backup_list)
     
     try:
-        # Prompt ภาษาไทย (ฉบับแฟนคลับ)
         prompt_th = f"""
         Role: คุณคือตัวแทนจาก "โปรเจกต์แฟนคลับ (@Jaiidees)" ที่ทำกิจกรรมแจกของที่ระลึกด้วยใจรัก
         Tone: อบอุ่น, ละมุน, เป็นกันเอง (เหมือนเพื่อนคุยกับเพื่อน), น่ารัก, ให้เกียรติ แต่ไม่ทางการ (Not Official)
         Language: ภาษาไทยที่อ่านแล้วยิ้มตาม (ความยาว 3-4 บรรทัด)
-
-        Input: เพื่อนแฟนคลับชื่อ "{name}"
-
-        Task: เขียนข้อความขอบคุณที่มาร่วมสนุกกับโปรเจกต์เล็กๆ ของเรา:
-        1. **ทักทาย:** ขอบคุณที่แวะมาเล่นกิจกรรม Fan Project ของเรานะ
-        2. **ความเชื่อมโยง:** ดีใจที่เราได้มารักศิลปินคนเดียวกัน และได้เจอกันในงาน Riser Concert นี้
-        3. **อวยพร:** ขอให้วันนี้เป็นวันที่ใจฟู ได้โมเมนต์กลับไปเยอะๆ และเดินทางกลับบ้านปลอดภัย
-        4. **ปิดท้าย:** Quote ภาษาอังกฤษสั้นๆ เกี่ยวกับ Music หรือ Happiness 1 ประโยค
-
-        *ไม่ต้องใส่หัวข้อ เขียนเป็นย่อหน้าน่ารักๆ ต่อกันเลย*
+        Input: เพื่อนแฟนคลับชื่อ "{name}" เมนฝั่ง "{gender.upper()}"
+        Task: เขียนข้อความขอบคุณที่มาร่วมสนุกกับโปรเจกต์แฟนคลับ: 1.ทักทาย 2.ความเชื่อมโยงที่รักศิลปินเหมือนกัน 3.อวยพรให้ใจฟูและเดินทางปลอดภัย 4.ปิดท้าย Quote ภาษาอังกฤษสั้นๆ
         """
-
-        # Prompt ภาษาอังกฤษ (Fan Project Ver.)
         prompt_en = f"""
         Role: You are a representative from the "Fan Project (@Jaiidees)", created with love by fans for fans.
         Tone: Warm, soft, friendly (Fan-to-Fan connection), sweet, and not corporate/official.
         Language: Heartwarming English (Length: 3-4 sentences).
-
         Input: Fellow fan named "{name}" supporting the "{gender.upper()}" side.
-
-        Task: Write a thank you note for joining our small project:
-        1. **Greeting:** Thanks for stopping by to play our Fan Project gacha.
-        2. **Connection:** So happy we share the same love for the artist at Riser Concert.
-        3. **Wish:** Hope your heart is full of joy today, wishing you the best moments and safe travels home.
-        4. **Closing:** A short English Quote about Music or Happiness.
-
-        *No headers. Just a beautiful, continuous paragraph.*
+        Task: Write a thank you note for joining our fan project gacha. Express joy in sharing the same love for the artist. Wish them joy and safe travels. End with a short English Quote.
         """
-
         final_prompt = prompt_en if lang == 'en' else prompt_th
 
-        # เรียก AI พร้อม Timeout 5 วินาที (ถ้าเกิน 5 วิ ตัดไปใช้ Backup เลย)
-        # ต้องใช้ asyncio.wait_for เพื่อคุมเวลา
         response = await asyncio.wait_for(
             client_ai.aio.models.generate_content(
                 model=AI_MODEL_NAME,
                 contents=final_prompt,
-                config=types.GenerateContentConfig(
-                    temperature=0.8,
-                )
+                config=types.GenerateContentConfig(temperature=0.8)
             ),
-            timeout=5.0 # ⏳ รอสูงสุดแค่ 5 วินาที
+            timeout=5.0
         )
         return response.text.strip()
-
-    except asyncio.TimeoutError:
-        print(f"⏰ AI Timeout (Over 5s) -> Using Manual Backup")
-        return random.choice(backup_list)
-        
     except Exception as e:
         print(f"🔥 AI Error ({AI_MODEL_NAME}): {e} -> Using Manual Backup")
         return random.choice(backup_list)
@@ -196,7 +161,6 @@ async def get_system_status(request: Request):
     auth_header = request.headers.get("X-Admin-Key")
     if auth_header != ADMIN_SECRET:
         raise HTTPException(401, "Unauthorized")
-    
     status = settings.find_one({"key": "system_status"})
     return {"is_active": status.get("is_active", False)}
 
@@ -205,13 +169,10 @@ async def toggle_system(request: Request):
     auth_header = request.headers.get("X-Admin-Key")
     if auth_header != ADMIN_SECRET:
         raise HTTPException(401, "Unauthorized")
-    
     current = settings.find_one({"key": "system_status"})
     new_status = not current.get("is_active", False)
-    
     settings.update_one({"key": "system_status"}, {"$set": {"is_active": new_status}})
     return {"is_active": new_status}
-
 
 @app.post("/api/play")
 async def play_gacha(request: Request):
@@ -225,8 +186,10 @@ async def play_gacha(request: Request):
         name = data.get("name", "Fan")
         lang = data.get("lang", "th")
         
+        # ✅ จับ IP จริง
         client_ip = request.headers.get("X-Forwarded-For") or request.client.host
-        if "," in client_ip: client_ip = client_ip.split(",")[0]
+        if "," in client_ip: client_ip = client_ip.split(",")[0].strip()
+        
         ip_hash = get_ip_hash(client_ip)
 
         if players.find_one({"ip_hash": ip_hash}):
@@ -242,8 +205,10 @@ async def play_gacha(request: Request):
         selected_image = get_random_image(gender)
         blessing = await generate_blessing(name, gender, lang)
 
+        # ✅ บันทึก IP จริงลง Database ด้วย (เพื่อโชว์ใน Admin)
         players.insert_one({
             "ip_hash": ip_hash,
+            "ip_address": client_ip,  # <--- เพิ่มตรงนี้
             "gender": gender,
             "name": name,
             "image_file": selected_image,
@@ -267,7 +232,6 @@ def get_image(gender: str, filename: str):
     path = os.path.join(IMAGE_DIR, gender, filename)
     if not os.path.exists(path):
         path = os.path.join("/app/assets", gender, filename)
-    
     if os.path.exists(path):
         return FileResponse(path)
     raise HTTPException(404)
@@ -277,7 +241,6 @@ async def get_history(request: Request):
     auth_header = request.headers.get("X-Admin-Key")
     if auth_header != ADMIN_SECRET:
         raise HTTPException(401, "Unauthorized")
-
     try:
         cursor = players.find({}, {"_id": 0}).sort("played_at", -1).limit(100)
         logs = list(cursor)
@@ -290,13 +253,12 @@ async def delete_history(ip_hash: str, request: Request):
     auth_header = request.headers.get("X-Admin-Key")
     if auth_header != ADMIN_SECRET:
         raise HTTPException(401, "Unauthorized")
-        
     result = players.delete_one({"ip_hash": ip_hash})
     if result.deleted_count == 1:
         return {"status": "deleted"}
     raise HTTPException(404, "Record not found")
 
-# --- 5. Frontend Serve ---
+# --- Frontend Serve ---
 if os.path.exists(os.path.join(STATIC_DIR, "assets")):
     app.mount("/assets", StaticFiles(directory=os.path.join(STATIC_DIR, "assets")), name="static")
 

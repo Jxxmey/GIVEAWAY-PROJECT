@@ -1,20 +1,26 @@
 import { useState, useEffect } from 'react'
-import { Lock, Database, Clock, Image as ImageIcon, LogOut, Trash2, FileDown, ShieldCheck, Power } from 'lucide-react'
+import { Lock, Database, Clock, Image as ImageIcon, LogOut, Trash2, FileDown, ShieldCheck, Power, RefreshCw } from 'lucide-react'
 
 export default function Admin() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [secretKey, setSecretKey] = useState('')
   const [data, setData] = useState([])
   const [loading, setLoading] = useState(false)
-  const [systemActive, setSystemActive] = useState(false) // ✅ State สำหรับสถานะระบบ
+  const [systemActive, setSystemActive] = useState(false)
 
-  // Fetch ข้อมูลและสถานะระบบเมื่อ Login ผ่าน
+  // ✅ 1. ตรวจสอบว่ามีรหัสเดิมที่เคยใส่ไว้ไหม (Auto Login)
+  useEffect(() => {
+    const savedKey = localStorage.getItem('admin_key')
+    if (savedKey) {
+      setSecretKey(savedKey)
+      fetchAllData(savedKey) // ลองดึงข้อมูลเลย
+    }
+  }, [])
+
   const fetchAllData = async (key) => {
+    setLoading(true)
     try {
-        // 1. ดึง History
         const resHistory = await fetch('/api/admin/history', { headers: { 'X-Admin-Key': key } })
-        
-        // 2. ดึง System Status
         const resStatus = await fetch('/api/admin/system_status', { headers: { 'X-Admin-Key': key } })
         
         if (resHistory.ok && resStatus.ok) {
@@ -24,22 +30,32 @@ export default function Admin() {
             setData(jsonHistory.data)
             setSystemActive(jsonStatus.is_active)
             setIsAuthenticated(true)
+            
+            // ✅ 2. บันทึกรหัสลงเครื่อง ถ้า Login ผ่าน
+            localStorage.setItem('admin_key', key)
         } else {
-            alert("❌ Access Denied: รหัสผ่านไม่ถูกต้อง")
+            // ถ้า Key ผิด ให้ลบออกจากเครื่อง
+            if (isAuthenticated) alert("Session Expired")
+            localStorage.removeItem('admin_key')
+            setIsAuthenticated(false)
         }
     } catch (err) {
+        console.error(err)
         alert("Error connecting to server")
+    } finally {
+        setLoading(false)
     }
   }
 
-  const handleLogin = async (e) => {
+  const handleLogin = (e) => {
     e.preventDefault()
-    setLoading(true)
-    await fetchAllData(secretKey)
-    setLoading(false)
+    fetchAllData(secretKey)
   }
 
-  // ✅ ฟังก์ชันกดสวิตช์ เปิด/ปิด
+  const handleRefresh = () => {
+    fetchAllData(secretKey)
+  }
+
   const toggleSystem = async () => {
       const confirmMsg = systemActive 
           ? "🔴 ต้องการ 'ปิด' ระบบหรือไม่?\n(ผู้ใช้จะไม่สามารถเล่นเกมได้)" 
@@ -74,34 +90,36 @@ export default function Admin() {
             alert("ลบไม่สำเร็จ")
         }
     } catch (err) {
-        console.error(err)
         alert("เกิดข้อผิดพลาดในการเชื่อมต่อ")
     }
   }
 
   const handleLogout = () => {
+    // ✅ 3. ลบรหัสเมื่อ Logout
+    localStorage.removeItem('admin_key')
     setIsAuthenticated(false)
     setSecretKey('')
     setData([])
   }
 
   const exportToCSV = () => {
-    const headers = ["Timestamp", "Name", "Gender", "IP Hash (ID)", "Message", "Image File"];
+    // ✅ 4. แก้ภาษาต่างดาวด้วย BOM (\uFEFF)
+    const headers = ["Timestamp", "Name", "Gender", "IP Address", "IP Hash (ID)", "Message", "Image File"];
     
     const rows = data.map(row => [
         new Date(row.played_at).toLocaleString('en-US'),
         `"${row.name.replace(/"/g, '""')}"`,
         row.gender,
+        // ✅ 5. แสดง IP จริง (ถ้ามี)
+        row.ip_address || "N/A", 
         row.ip_hash,
         `"${row.blessing.replace(/"/g, '""').replace(/\n/g, ' ')}"`,
         row.image_file
     ]);
 
-    const csvContent = "data:text/csv;charset=utf-8," 
-        + headers.join(",") + "\n" 
-        + rows.map(e => e.join(",")).join("\n");
+    const csvContent = "\uFEFF" + [headers.join(","), ...rows.map(e => e.join(","))].join("\n");
 
-    const encodedUri = encodeURI(csvContent);
+    const encodedUri = encodeURI("data:text/csv;charset=utf-8," + csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
     link.setAttribute("download", `Riser_Gacha_Export_${new Date().toISOString().slice(0,10)}.csv`);
@@ -165,19 +183,29 @@ export default function Admin() {
         </div>
 
         {/* Center: System Toggle */}
-        <div 
-            onClick={toggleSystem}
-            className={`cursor-pointer flex items-center gap-3 px-4 py-2 rounded-full border transition-all select-none shadow-sm ${
-                systemActive 
-                ? 'bg-green-50 border-green-200 text-green-700 hover:bg-green-100' 
-                : 'bg-red-50 border-red-200 text-red-700 hover:bg-red-100'
-            }`}
-        >
-            <div className={`w-3 h-3 rounded-full ${systemActive ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`}></div>
-            <span className="text-xs font-bold uppercase tracking-wide">
-                SYSTEM: {systemActive ? 'ONLINE (OPEN)' : 'OFFLINE (CLOSED)'}
-            </span>
-            <Power size={14} />
+        <div className="flex items-center gap-2">
+            <div 
+                onClick={toggleSystem}
+                className={`cursor-pointer flex items-center gap-3 px-4 py-2 rounded-full border transition-all select-none shadow-sm ${
+                    systemActive 
+                    ? 'bg-green-50 border-green-200 text-green-700 hover:bg-green-100' 
+                    : 'bg-red-50 border-red-200 text-red-700 hover:bg-red-100'
+                }`}
+            >
+                <div className={`w-3 h-3 rounded-full ${systemActive ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`}></div>
+                <span className="text-xs font-bold uppercase tracking-wide">
+                    {systemActive ? 'ONLINE' : 'OFFLINE'}
+                </span>
+                <Power size={14} />
+            </div>
+            {/* ✅ ปุ่ม Refresh ข้อมูล */}
+            <button
+                onClick={handleRefresh}
+                className="p-2 rounded-full bg-slate-100 text-slate-600 hover:bg-blue-50 hover:text-blue-600 transition-colors border border-slate-200"
+                title="Refresh Data"
+            >
+                <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
+            </button>
         </div>
 
         {/* Right: Actions */}
@@ -206,6 +234,7 @@ export default function Admin() {
                 <tr>
                   <th className="px-4 py-4 font-medium w-32">Timestamp</th>
                   <th className="px-4 py-4 font-medium w-48">User Info</th>
+                  <th className="px-4 py-4 font-medium w-32">IP Address</th> {/* ✅ โชว์ IP จริง */}
                   <th className="px-4 py-4 font-medium w-32">IP Hash (ID)</th>
                   <th className="px-4 py-4 font-medium">Message</th>
                   <th className="px-4 py-4 font-medium text-right w-32">Actions</th>
@@ -229,9 +258,15 @@ export default function Admin() {
                         {log.gender === 'male' ? 'BOY SIDE' : 'GIRL SIDE'}
                       </span>
                     </td>
+                    {/* ✅ แสดง IP จริง */}
                     <td className="px-4 py-4">
-                        <div className="flex items-center gap-1 text-[10px] font-mono text-slate-500 bg-slate-100 px-2 py-1 rounded border border-slate-200" title={log.ip_hash}>
-                            <ShieldCheck size={10} className="text-slate-400"/>
+                         <div className="font-mono text-xs text-slate-600 bg-slate-100 px-2 py-1 rounded w-fit">
+                             {log.ip_address || "N/A"}
+                         </div>
+                    </td>
+                    <td className="px-4 py-4">
+                        <div className="flex items-center gap-1 text-[10px] font-mono text-slate-400" title={log.ip_hash}>
+                            <ShieldCheck size={10} />
                             {log.ip_hash.substring(0, 8)}...
                         </div>
                     </td>
