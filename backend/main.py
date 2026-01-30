@@ -3,6 +3,7 @@ import random
 import hashlib
 import asyncio
 import httpx
+from math import ceil # ✅ เพิ่ม import math
 from datetime import datetime
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse
@@ -174,6 +175,48 @@ async def toggle_system(request: Request):
     settings.update_one({"key": "system_status"}, {"$set": {"is_active": new_status}})
     return {"is_active": new_status}
 
+# ✅ API ประวัติแบบแบ่งหน้า (Pagination)
+@app.get("/api/admin/history")
+async def get_history(request: Request, page: int = 1, limit: int = 100):
+    auth_header = request.headers.get("X-Admin-Key")
+    if auth_header != ADMIN_SECRET:
+        raise HTTPException(401, "Unauthorized")
+
+    try:
+        skip = (page - 1) * limit
+        total_docs = players.count_documents({})
+        total_pages = ceil(total_docs / limit) if limit > 0 else 1
+        
+        cursor = players.find({}, {"_id": 0}).sort("played_at", -1).skip(skip).limit(limit)
+        logs = list(cursor)
+        return {
+            "status": "success", 
+            "data": logs, 
+            "pagination": {
+                "page": page,
+                "limit": limit,
+                "total_docs": total_docs,
+                "total_pages": total_pages
+            }
+        }
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+# ✅ API สำหรับ Export ข้อมูลทั้งหมด (ไม่จำกัดหน้า)
+@app.get("/api/admin/export")
+async def get_export_data(request: Request):
+    auth_header = request.headers.get("X-Admin-Key")
+    if auth_header != ADMIN_SECRET:
+        raise HTTPException(401, "Unauthorized")
+
+    try:
+        # ดึงข้อมูลทั้งหมด
+        cursor = players.find({}, {"_id": 0}).sort("played_at", -1)
+        logs = list(cursor)
+        return {"status": "success", "data": logs}
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
 @app.post("/api/play")
 async def play_gacha(request: Request):
     try:
@@ -186,7 +229,6 @@ async def play_gacha(request: Request):
         name = data.get("name", "Fan")
         lang = data.get("lang", "th")
         
-        # ✅ จับ IP จริง
         client_ip = request.headers.get("X-Forwarded-For") or request.client.host
         if "," in client_ip: client_ip = client_ip.split(",")[0].strip()
         
@@ -205,10 +247,9 @@ async def play_gacha(request: Request):
         selected_image = get_random_image(gender)
         blessing = await generate_blessing(name, gender, lang)
 
-        # ✅ บันทึก IP จริงลง Database ด้วย (เพื่อโชว์ใน Admin)
         players.insert_one({
             "ip_hash": ip_hash,
-            "ip_address": client_ip,  # <--- เพิ่มตรงนี้
+            "ip_address": client_ip, 
             "gender": gender,
             "name": name,
             "image_file": selected_image,
@@ -235,18 +276,6 @@ def get_image(gender: str, filename: str):
     if os.path.exists(path):
         return FileResponse(path)
     raise HTTPException(404)
-
-@app.get("/api/admin/history")
-async def get_history(request: Request):
-    auth_header = request.headers.get("X-Admin-Key")
-    if auth_header != ADMIN_SECRET:
-        raise HTTPException(401, "Unauthorized")
-    try:
-        cursor = players.find({}, {"_id": 0}).sort("played_at", -1).limit(100)
-        logs = list(cursor)
-        return {"status": "success", "data": logs}
-    except Exception as e:
-        raise HTTPException(500, str(e))
 
 @app.delete("/api/admin/delete/{ip_hash}")
 async def delete_history(ip_hash: str, request: Request):

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Lock, Database, Clock, Image as ImageIcon, LogOut, Trash2, FileDown, ShieldCheck, Power, RefreshCw } from 'lucide-react'
+import { Lock, Database, Clock, Image as ImageIcon, LogOut, Trash2, FileDown, ShieldCheck, Power, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react'
 
 export default function Admin() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
@@ -7,20 +7,26 @@ export default function Admin() {
   const [data, setData] = useState([])
   const [loading, setLoading] = useState(false)
   const [systemActive, setSystemActive] = useState(false)
+  
+  // ✅ Pagination State
+  const [page, setPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [totalDocs, setTotalDocs] = useState(0)
 
-  // ✅ 1. ตรวจสอบว่ามีรหัสเดิมที่เคยใส่ไว้ไหม (Auto Login)
   useEffect(() => {
     const savedKey = localStorage.getItem('admin_key')
     if (savedKey) {
       setSecretKey(savedKey)
-      fetchAllData(savedKey) // ลองดึงข้อมูลเลย
+      fetchAllData(savedKey, 1) // เริ่มที่หน้า 1
     }
   }, [])
 
-  const fetchAllData = async (key) => {
+  // ✅ ฟังก์ชันดึงข้อมูลรองรับ Page
+  const fetchAllData = async (key, pageNum = 1) => {
     setLoading(true)
     try {
-        const resHistory = await fetch('/api/admin/history', { headers: { 'X-Admin-Key': key } })
+        // ดึง History (แบบแบ่งหน้า)
+        const resHistory = await fetch(`/api/admin/history?page=${pageNum}&limit=100`, { headers: { 'X-Admin-Key': key } })
         const resStatus = await fetch('/api/admin/system_status', { headers: { 'X-Admin-Key': key } })
         
         if (resHistory.ok && resStatus.ok) {
@@ -28,13 +34,17 @@ export default function Admin() {
             const jsonStatus = await resStatus.json()
             
             setData(jsonHistory.data)
+            // อัปเดตข้อมูล Pagination
+            if (jsonHistory.pagination) {
+                setPage(jsonHistory.pagination.page)
+                setTotalPages(jsonHistory.pagination.total_pages)
+                setTotalDocs(jsonHistory.pagination.total_docs)
+            }
+            
             setSystemActive(jsonStatus.is_active)
             setIsAuthenticated(true)
-            
-            // ✅ 2. บันทึกรหัสลงเครื่อง ถ้า Login ผ่าน
             localStorage.setItem('admin_key', key)
         } else {
-            // ถ้า Key ผิด ให้ลบออกจากเครื่อง
             if (isAuthenticated) alert("Session Expired")
             localStorage.removeItem('admin_key')
             setIsAuthenticated(false)
@@ -49,11 +59,17 @@ export default function Admin() {
 
   const handleLogin = (e) => {
     e.preventDefault()
-    fetchAllData(secretKey)
+    fetchAllData(secretKey, 1)
   }
 
   const handleRefresh = () => {
-    fetchAllData(secretKey)
+    fetchAllData(secretKey, page) // รีเฟรชหน้าปัจจุบัน
+  }
+
+  const handlePageChange = (newPage) => {
+      if (newPage >= 1 && newPage <= totalPages) {
+          fetchAllData(secretKey, newPage)
+      }
   }
 
   const toggleSystem = async () => {
@@ -85,7 +101,8 @@ export default function Admin() {
         })
 
         if (res.ok) {
-            setData(data.filter(item => item.ip_hash !== ipHash))
+            // ลบแล้วรีเฟรชหน้าปัจจุบัน
+            handleRefresh()
         } else {
             alert("ลบไม่สำเร็จ")
         }
@@ -95,37 +112,51 @@ export default function Admin() {
   }
 
   const handleLogout = () => {
-    // ✅ 3. ลบรหัสเมื่อ Logout
     localStorage.removeItem('admin_key')
     setIsAuthenticated(false)
     setSecretKey('')
     setData([])
+    setPage(1)
   }
 
-  const exportToCSV = () => {
-    // ✅ 4. แก้ภาษาต่างดาวด้วย BOM (\uFEFF)
-    const headers = ["Timestamp", "Name", "Gender", "IP Address", "IP Hash (ID)", "Message", "Image File"];
-    
-    const rows = data.map(row => [
-        new Date(row.played_at).toLocaleString('en-US'),
-        `"${row.name.replace(/"/g, '""')}"`,
-        row.gender,
-        // ✅ 5. แสดง IP จริง (ถ้ามี)
-        row.ip_address || "N/A", 
-        row.ip_hash,
-        `"${row.blessing.replace(/"/g, '""').replace(/\n/g, ' ')}"`,
-        row.image_file
-    ]);
+  // ✅ ฟังก์ชัน Export All
+  const exportToCSV = async () => {
+    if (!window.confirm("ต้องการดาวน์โหลดข้อมูลทั้งหมด (Export All)?")) return
 
-    const csvContent = "\uFEFF" + [headers.join(","), ...rows.map(e => e.join(","))].join("\n");
+    try {
+        // เรียก API ใหม่ที่ดึงข้อมูลทั้งหมด
+        const res = await fetch('/api/admin/export', { headers: { 'X-Admin-Key': secretKey } })
+        if (!res.ok) throw new Error("Export failed")
+        
+        const json = await res.json()
+        const allData = json.data
+        
+        // ตามคอลัมน์ที่ขอ: Timestamp, Name, Gender, IP Address, IP Hash (ID), Message, Blessing, Image File
+        const headers = ["Timestamp", "Name", "Gender", "IP Address", "IP Hash (ID)", "Message", "Blessing", "Image File"];
+        
+        const rows = allData.map(row => [
+            new Date(row.played_at).toLocaleString('en-US'),
+            `"${row.name.replace(/"/g, '""')}"`,
+            row.gender,
+            row.ip_address || "N/A",
+            row.ip_hash,
+            `"${row.blessing.replace(/"/g, '""').replace(/\n/g, ' ')}"`, // Message
+            `"${row.blessing.replace(/"/g, '""').replace(/\n/g, ' ')}"`, // Blessing (ซ้ำตามคำขอ)
+            row.image_file
+        ]);
 
-    const encodedUri = encodeURI("data:text/csv;charset=utf-8," + csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `Riser_Gacha_Export_${new Date().toISOString().slice(0,10)}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+        const csvContent = "\uFEFF" + [headers.join(","), ...rows.map(e => e.join(","))].join("\n");
+
+        const encodedUri = encodeURI("data:text/csv;charset=utf-8," + csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", `Riser_Gacha_Full_Export_${new Date().toISOString().slice(0,10)}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    } catch (err) {
+        alert("Export Error: " + err.message)
+    }
   }
 
   // --- LOGIN SCREEN ---
@@ -178,11 +209,11 @@ export default function Admin() {
           </div>
           <div>
             <h1 className="text-sm font-bold text-slate-900">Admin Dashboard</h1>
-            <p className="text-[10px] text-slate-500">History Log ({data.length})</p>
+            <p className="text-[10px] text-slate-500">Total {totalDocs} records | Page {page}/{totalPages}</p>
           </div>
         </div>
 
-        {/* Center: System Toggle */}
+        {/* Center: System Toggle & Refresh */}
         <div className="flex items-center gap-2">
             <div 
                 onClick={toggleSystem}
@@ -198,7 +229,6 @@ export default function Admin() {
                 </span>
                 <Power size={14} />
             </div>
-            {/* ✅ ปุ่ม Refresh ข้อมูล */}
             <button
                 onClick={handleRefresh}
                 className="p-2 rounded-full bg-slate-100 text-slate-600 hover:bg-blue-50 hover:text-blue-600 transition-colors border border-slate-200"
@@ -214,7 +244,7 @@ export default function Admin() {
                 onClick={exportToCSV}
                 className="flex items-center gap-2 text-xs font-bold text-green-700 bg-green-50 hover:bg-green-100 px-3 py-2 rounded-lg transition-colors border border-green-200"
             >
-                <FileDown size={14} /> CSV
+                <FileDown size={14} /> CSV All
             </button>
             <button 
                 onClick={handleLogout}
@@ -227,14 +257,14 @@ export default function Admin() {
 
       {/* Content */}
       <main className="max-w-6xl mx-auto p-6">
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden mb-6">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
               <thead className="bg-slate-50 border-b border-slate-200 text-slate-500">
                 <tr>
                   <th className="px-4 py-4 font-medium w-32">Timestamp</th>
                   <th className="px-4 py-4 font-medium w-48">User Info</th>
-                  <th className="px-4 py-4 font-medium w-32">IP Address</th> {/* ✅ โชว์ IP จริง */}
+                  <th className="px-4 py-4 font-medium w-32">IP Address</th>
                   <th className="px-4 py-4 font-medium w-32">IP Hash (ID)</th>
                   <th className="px-4 py-4 font-medium">Message</th>
                   <th className="px-4 py-4 font-medium text-right w-32">Actions</th>
@@ -258,7 +288,6 @@ export default function Admin() {
                         {log.gender === 'male' ? 'BOY SIDE' : 'GIRL SIDE'}
                       </span>
                     </td>
-                    {/* ✅ แสดง IP จริง */}
                     <td className="px-4 py-4">
                          <div className="font-mono text-xs text-slate-600 bg-slate-100 px-2 py-1 rounded w-fit">
                              {log.ip_address || "N/A"}
@@ -303,6 +332,30 @@ export default function Admin() {
                 </div>
             )}
           </div>
+        </div>
+
+        {/* ✅ Pagination Controls */}
+        <div className="flex items-center justify-between">
+            <p className="text-xs text-slate-500">Showing 100 records per page</p>
+            <div className="flex items-center gap-2">
+                <button 
+                    onClick={() => handlePageChange(page - 1)}
+                    disabled={page <= 1}
+                    className="p-2 rounded-lg bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                    <ChevronLeft size={16} />
+                </button>
+                <span className="text-xs font-bold text-slate-600 px-2">
+                    Page {page} of {totalPages}
+                </span>
+                <button 
+                    onClick={() => handlePageChange(page + 1)}
+                    disabled={page >= totalPages}
+                    className="p-2 rounded-lg bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                    <ChevronRight size={16} />
+                </button>
+            </div>
         </div>
       </main>
     </div>
