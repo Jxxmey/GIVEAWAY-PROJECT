@@ -3,11 +3,13 @@ import random
 import hashlib
 import asyncio
 import httpx
+import time
 from math import ceil
 from datetime import datetime
+from typing import List, Dict
 from bson import ObjectId
-from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse
+from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect, Depends
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pymongo import MongoClient
@@ -28,10 +30,49 @@ ADMIN_SECRET = os.getenv("ADMIN_SECRET", "my_super_secret")
 SELF_URL = os.getenv("RENDER_EXTERNAL_URL", "http://127.0.0.1:8000")
 AI_MODEL_NAME = os.getenv("AI_MODEL_NAME", "gemini-flash-latest")
 
-# Middleware
+# --- Security: Rate Limiter (Simple In-Memory) ---
+class SimpleRateLimiter:
+    def __init__(self):
+        self.requests: Dict[str, List[float]] = {}
+    
+    def is_allowed(self, ip: str, limit: int = 5, window: int = 60) -> bool:
+        """Allow 'limit' requests per 'window' seconds"""
+        now = time.time()
+        if ip not in self.requests:
+            self.requests[ip] = []
+        
+        # Clean old requests
+        self.requests[ip] = [t for t in self.requests[ip] if now - t < window]
+        
+        if len(self.requests[ip]) >= limit:
+            return False
+            
+        self.requests[ip].append(now)
+        return True
+
+rate_limiter = SimpleRateLimiter()
+
+async def check_rate_limit(request: Request):
+    client_ip = request.headers.get("X-Forwarded-For") or request.client.host
+    if "," in client_ip: client_ip = client_ip.split(",")[0].strip()
+    
+    # Limit: 10 requests per minute for API calls (Adjust as needed)
+    if not rate_limiter.is_allowed(client_ip, limit=20, window=60):
+        raise HTTPException(status_code=429, detail="Too Many Requests")
+    return True
+
+# --- Security: CORS ---
+# Production: Should restrict to your frontend domain
+origins = [
+    "http://localhost:5173",
+    "http://localhost:4173",
+    SELF_URL,
+    "*" # Keep * for development, change to specific domains in production
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=origins,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -42,13 +83,11 @@ try:
     db = client_db['riser_gacha']
     players = db['players']
     settings = db['settings']
-    chats = db['chats'] # ✅ Collection ใหม่สำหรับเก็บห้องแชท
+    chats = db['chats']
     
-    # Create Indexes
     players.create_index("ip_hash", unique=True)
     chats.create_index("session_id", unique=True)
     
-    # Initialize Settings
     if not settings.find_one({"key": "system_status"}):
         settings.insert_one({"key": "system_status", "is_active": False})
         print("🔒 System initialized as CLOSED")
@@ -70,38 +109,51 @@ if GEMINI_KEY:
 IMAGE_DIR = "/app/processed_images"
 STATIC_DIR = "/app/static"
 
-# --- Backup Messages (Fallback) ---
+# Backup Messages
 BACKUP_MESSAGES_TH = [
     "ขอบคุณที่มาร่วมสนุกกับโปรเจกต์เล็กๆ ของเรานะ! ดีใจที่ได้เจอกันในงาน Riser Concert ขอให้วันนี้เป็นวันที่ใจฟู ได้โมเมนต์กลับไปเยอะๆ และเดินทางกลับบ้านปลอดภัยนะ\n\n\"Music is the strongest form of magic.\"",
-    "ฮัลโหลลล! ขอบคุณที่แวะมาเล่นกิจกรรม Fan Project นะคะ ดีใจมากที่เราชอบศิลปินคนเดียวกัน ขอให้วันนี้มีความสุขสุดๆ เก็บความทรงจำดีๆ กลับไปให้เต็มกระเป๋าเลย!\n\n\"Where words fail, music speaks.\"",
-    "ยินดีต้อนรับสู่โปรเจกต์แฟนคลับของเราครับ! ดีใจที่ได้เป็นส่วนหนึ่งในวันสำคัญนี้ ขอให้สนุกกับคอนเสิร์ต ร้องเพลงให้สุดเสียง และกลับบ้านอย่างมีความสุขนะครับ\n\n\"Happiness is seeing your favorite artist live.\"",
-    "ขอบคุณที่มาร่วมเป็นส่วนหนึ่งของความทรงจำนี้นะ! หวังว่าของขวัญเล็กๆ นี้จะทำให้เธอยิ้มได้ ขอให้วันนี้เป็นวันที่สดใสและเต็มไปด้วยพลังบวกนะ เดินทางปลอดภัยจ้า\n\n\"Life is short, buy the concert tickets.\"",
-    "งู้ยยย ขอบคุณที่มาเล่นด้วยกันน้า! ดีใจที่ได้เจอคนรักศิลปินเหมือนกัน ขอให้วันนี้ได้รับพลังงานดีๆ กลับไปเต็มเปี่ยม ดูแลสุขภาพและเดินทางกลับดีๆ นะคะ\n\n\"Music binds our souls, hearts, and emotions.\""
+    "ฮัลโหลลล! ขอบคุณที่แวะมาเล่นกิจกรรม Fan Project นะคะ ดีใจมากที่เราชอบศิลปินคนเดียวกัน ขอให้วันนี้มีความสุขสุดๆ เก็บความทรงจำดีๆ กลับไปให้เต็มกระเป๋าเลย!\n\n\"Where words fail, music speaks.\""
 ]
-
 BACKUP_MESSAGES_EN = [
     "Thanks for stopping by our Fan Project gacha! So happy we share the same love for the artist at Riser Concert. Hope your heart is full of joy today. Safe travels home!\n\n\"Music is the strongest form of magic.\"",
-    "Hello fellow fan! Thank you for joining our small project. Wishing you the best moments and a wonderful time at the concert. Have a safe trip back!\n\n\"Where words fail, music speaks.\"",
-    "Welcome to our Fan Project! It's amazing to see you here. Hope this little gift brings a smile to your face. Enjoy the music and have a safe journey!\n\n\"Happiness is seeing your favorite artist live.\"",
-    "So glad you are here! Thank you for supporting our project. May your day be filled with happiness and great memories. Take care and stay safe!\n\n\"Life is short, buy the concert tickets.\"",
-    "Thank you for being part of this memory! Sending you lots of love and positive energy. Hope you have an incredible time today. Safe travels!\n\n\"Music binds our souls, hearts, and emotions.\""
+    "Hello fellow fan! Thank you for joining our small project. Wishing you the best moments. Have a safe trip back!\n\n\"Where words fail, music speaks.\""
 ]
 
-# --- 2. Background Tasks ---
+# --- 2. WebSocket Connection Manager (Real-time Chat) ---
+class ConnectionManager:
+    def __init__(self):
+        self.active_connections: List[WebSocket] = []
+
+    async def connect(self, websocket: WebSocket):
+        await websocket.accept()
+        self.active_connections.append(websocket)
+
+    def disconnect(self, websocket: WebSocket):
+        if websocket in self.active_connections:
+            self.active_connections.remove(websocket)
+
+    async def broadcast(self, message: dict):
+        for connection in self.active_connections:
+            try:
+                await connection.send_json(message)
+            except:
+                self.disconnect(connection)
+
+manager = ConnectionManager()
+
+# --- 3. Background Tasks ---
 
 @app.get("/api/health")
 async def health_check():
     return {"status": "alive", "timestamp": datetime.now()}
 
 async def keep_alive_ping():
-    """Ping own server every 5 mins to prevent sleeping"""
     await asyncio.sleep(10)
     print(f"🚀 Self-Ping system started. URL: {SELF_URL}/api/health")
     async with httpx.AsyncClient() as client:
         while True:
             try:
-                response = await client.get(f"{SELF_URL}/api/health", timeout=10)
-                # print(f"💓 Self-Ping success: {response.status_code}")
+                await client.get(f"{SELF_URL}/api/health", timeout=10)
             except Exception as e:
                 print(f"⚠️ Self-Ping failed: {e}")
             await asyncio.sleep(300)
@@ -110,11 +162,12 @@ async def keep_alive_ping():
 async def startup_event():
     asyncio.create_task(keep_alive_ping())
 
-# --- 3. Helpers ---
+# --- 4. Core Logic Helpers ---
 
 def get_ip_hash(ip: str):
     return hashlib.sha256(ip.encode()).hexdigest()
 
+# --- FEATURE: Rarity System (Weighted Random) ---
 def get_random_image(gender: str):
     target_dir = os.path.join(IMAGE_DIR, gender)
     if not os.path.exists(target_dir):
@@ -127,7 +180,20 @@ def get_random_image(gender: str):
     files = [f for f in os.listdir(target_dir) if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
     if not files:
         raise HTTPException(500, "No images found")
-    return random.choice(files)
+    
+    # Weight Logic: SSR (5%), SR (15%), Common (80%)
+    # Checks filename for keywords. Default is Common.
+    weights = []
+    for f in files:
+        fname = f.upper()
+        if "SSR" in fname:
+            weights.append(5)
+        elif "SR" in fname:
+            weights.append(15)
+        else:
+            weights.append(80)
+            
+    return random.choices(files, weights=weights, k=1)[0]
 
 async def generate_blessing(name: str, gender: str, lang: str):
     backup_list = BACKUP_MESSAGES_EN if lang == 'en' else BACKUP_MESSAGES_TH
@@ -135,100 +201,98 @@ async def generate_blessing(name: str, gender: str, lang: str):
         return random.choice(backup_list)
     
     try:
-        prompt_th = f"""
-        Role: คุณคือตัวแทนจาก "โปรเจกต์แฟนคลับ (@Jaiidees)" ที่ทำกิจกรรมแจกของที่ระลึกด้วยใจรัก
-        Tone: อบอุ่น, ละมุน, เป็นกันเอง, น่ารัก, ให้เกียรติ แต่ไม่ทางการ
-        Language: ภาษาไทยที่อ่านแล้วยิ้มตาม (ความยาว 3-4 บรรทัด)
-        Input: เพื่อนแฟนคลับชื่อ "{name}" เมนฝั่ง "{gender.upper()}"
-        Task: เขียนข้อความขอบคุณที่มาร่วมสนุกกับโปรเจกต์แฟนคลับ: 1.ทักทาย 2.ความเชื่อมโยงที่รักศิลปินเหมือนกัน 3.อวยพรให้ใจฟูและเดินทางปลอดภัย 4.ปิดท้าย Quote ภาษาอังกฤษสั้นๆ
+        prompt = f"""
+        Role: Fan Project (@Jaiidees) Representative.
+        Tone: Warm, friendly, sweet.
+        Language: {'English' if lang == 'en' else 'Thai'}.
+        Input: Fan name "{name}", Bias side "{gender}".
+        Task: Write a short, heartwarming thank you note (3-4 lines) for joining the gacha. End with a short music quote.
         """
-        
-        prompt_en = f"""
-        Role: You are a representative from the "Fan Project (@Jaiidees)", created with love by fans for fans.
-        Tone: Warm, soft, friendly, sweet, and not corporate/official.
-        Language: Heartwarming English (Length: 3-4 sentences).
-        Input: Fellow fan named "{name}" supporting the "{gender.upper()}" side.
-        Task: Write a thank you note for joining our fan project gacha. Express joy in sharing the same love for the artist. Wish them joy and safe travels. End with a short English Quote.
-        """
-        
-        final_prompt = prompt_en if lang == 'en' else prompt_th
-
         response = await asyncio.wait_for(
             client_ai.aio.models.generate_content(
                 model=AI_MODEL_NAME,
-                contents=final_prompt,
+                contents=prompt,
                 config=types.GenerateContentConfig(temperature=0.8)
             ),
             timeout=5.0
         )
         return response.text.strip()
-    except Exception as e:
-        print(f"🔥 AI Error: {e} -> Using Manual Backup")
+    except Exception:
         return random.choice(backup_list)
 
-# --- 4. Chat System Routes (NEW) ---
+# --- 5. WebSocket Endpoint (New Chat) ---
 
-@app.post("/api/chat/send")
-async def send_chat(request: Request):
+@app.websocket("/ws/chat")
+async def websocket_endpoint(websocket: WebSocket):
+    await manager.connect(websocket)
     try:
-        data = await request.json()
-        session_id = data.get("session_id")
-        message = data.get("message")
-        name = data.get("name", "Fan")
-        
-        if not session_id or not message:
-            raise HTTPException(400, "Missing data")
-
-        # Prepare new message
-        new_msg = {
-            "sender": "user",
-            "text": message,
-            "timestamp": datetime.now()
-        }
-
-        # Check if chat exists
-        chat_room = chats.find_one({"session_id": session_id})
-
-        if chat_room:
-            # Update existing chat
-            chats.update_one(
-                {"session_id": session_id}, 
-                {
-                    "$push": {"messages": new_msg},
-                    "$set": {
-                        "last_updated": datetime.now(), 
-                        "is_read": False, 
-                        "name": name
-                    }
-                }
-            )
-        else:
-            # Create new chat
-            chats.insert_one({
-                "session_id": session_id,
-                "name": name,
-                "created_at": datetime.now(),
-                "last_updated": datetime.now(),
-                "is_read": False,
-                "messages": [new_msg]
-            })
+        while True:
+            data = await websocket.receive_json()
+            # Expected format: {"session_id": "...", "text": "...", "sender": "user", "name": "..."}
             
-        return {"status": "success"}
-    except Exception as e:
-        print(f"Chat Error: {e}")
-        raise HTTPException(500, str(e))
+            session_id = data.get("session_id")
+            text = data.get("text")
+            sender = data.get("sender", "user")
+            name = data.get("name", "Fan")
+            
+            if session_id and text:
+                msg_obj = {
+                    "sender": sender,
+                    "text": text,
+                    "timestamp": datetime.now().isoformat() # Send as string for JSON
+                }
+                
+                # Save to DB
+                existing = chats.find_one({"session_id": session_id})
+                if existing:
+                    chats.update_one(
+                        {"session_id": session_id},
+                        {
+                            "$push": {"messages": msg_obj},
+                            "$set": {"last_updated": datetime.now(), "is_read": False, "name": name}
+                        }
+                    )
+                else:
+                    chats.insert_one({
+                        "session_id": session_id,
+                        "name": name,
+                        "created_at": datetime.now(),
+                        "last_updated": datetime.now(),
+                        "is_read": False,
+                        "messages": [msg_obj]
+                    })
+                
+                # Broadcast back to everyone (or filter logic if needed)
+                # For simplicity in this project: Broadcast to all admins & the specific user
+                # Here we simply broadcast to everyone connected to the socket to update UI
+                # Real-world: You might want to filter by session_id, but for simple admin chat, this works.
+                data["timestamp"] = msg_obj["timestamp"]
+                await manager.broadcast(data)
+                
+    except WebSocketDisconnect:
+        manager.disconnect(websocket)
+
+# --- 6. API Routes ---
 
 @app.get("/api/chat/history/{session_id}")
 async def get_chat_history(session_id: str):
-    """API for User to poll chat history"""
     chat = chats.find_one({"session_id": session_id}, {"_id": 0})
     if chat:
-        return {"status": "success", "data": chat["messages"]}
+        # Convert datetime objects to string for JSON
+        msgs = chat.get("messages", [])
+        for m in msgs:
+            if isinstance(m.get("timestamp"), datetime):
+                m["timestamp"] = m["timestamp"].isoformat()
+        return {"status": "success", "data": msgs}
     return {"status": "empty", "data": []}
+
+# Deprecated: HTTP Send (Fallback)
+@app.post("/api/chat/send", dependencies=[Depends(check_rate_limit)])
+async def send_chat_http(request: Request):
+    return {"status": "use_websocket_instead"}
 
 @app.post("/api/admin/reply")
 async def admin_reply(request: Request):
-    """API for Admin to reply"""
     auth_header = request.headers.get("X-Admin-Key")
     if auth_header != ADMIN_SECRET:
         raise HTTPException(401, "Unauthorized")
@@ -238,51 +302,50 @@ async def admin_reply(request: Request):
         session_id = data.get("session_id")
         message = data.get("message")
         
+        msg_obj = {
+            "sender": "admin",
+            "text": message,
+            "timestamp": datetime.now().isoformat()
+        }
+        
         chats.update_one(
             {"session_id": session_id},
             {
-                "$push": {
-                    "messages": {
-                        "sender": "admin",
-                        "text": message,
-                        "timestamp": datetime.now()
-                    }
-                },
+                "$push": {"messages": msg_obj},
                 "$set": {"is_read": True}
             }
         )
+        
+        # Broadcast via WebSocket so user sees it immediately
+        await manager.broadcast({
+            "session_id": session_id,
+            "text": message,
+            "sender": "admin",
+            "timestamp": msg_obj["timestamp"]
+        })
+        
         return {"status": "success"}
     except Exception as e:
         raise HTTPException(500, str(e))
 
 @app.get("/api/admin/chats")
 async def get_all_chats(request: Request):
-    """API for Admin to list all chats"""
     auth_header = request.headers.get("X-Admin-Key")
     if auth_header != ADMIN_SECRET:
         raise HTTPException(401, "Unauthorized")
     
-    try:
-        # Get chats sorted by last update
-        cursor = chats.find({}).sort("last_updated", -1).limit(50)
-        chat_list = []
-        for c in cursor:
-            c["_id"] = str(c["_id"])
-            last_msg = c["messages"][-1]["text"] if c["messages"] else ""
-            
-            chat_list.append({
-                "session_id": c["session_id"],
-                "name": c["name"],
-                "last_message": last_msg,
-                "last_updated": c["last_updated"],
-                "is_read": c.get("is_read", True),
-                "messages": c["messages"]
-            })
-        return {"status": "success", "data": chat_list}
-    except Exception as e:
-        raise HTTPException(500, str(e))
-
-# --- 5. Main Game & Admin Routes ---
+    cursor = chats.find({}).sort("last_updated", -1).limit(50)
+    chat_list = []
+    for c in cursor:
+        last_msg = c["messages"][-1]["text"] if c["messages"] else ""
+        chat_list.append({
+            "session_id": c["session_id"],
+            "name": c.get("name", "Unknown"),
+            "last_message": last_msg,
+            "is_read": c.get("is_read", True),
+            # No full messages list to save bandwidth
+        })
+    return {"status": "success", "data": chat_list}
 
 @app.get("/api/admin/system_status")
 async def get_system_status(request: Request):
@@ -307,41 +370,17 @@ async def get_history(request: Request, page: int = 1, limit: int = 100):
     auth_header = request.headers.get("X-Admin-Key")
     if auth_header != ADMIN_SECRET:
         raise HTTPException(401, "Unauthorized")
+    
+    skip = (page - 1) * limit
+    total_docs = players.count_documents({})
+    cursor = players.find({}, {"_id": 0}).sort("played_at", -1).skip(skip).limit(limit)
+    return {
+        "status": "success",
+        "data": list(cursor),
+        "pagination": {"page": page, "total": total_docs}
+    }
 
-    try:
-        skip = (page - 1) * limit
-        total_docs = players.count_documents({})
-        total_pages = ceil(total_docs / limit) if limit > 0 else 1
-        
-        cursor = players.find({}, {"_id": 0}).sort("played_at", -1).skip(skip).limit(limit)
-        logs = list(cursor)
-        return {
-            "status": "success", 
-            "data": logs, 
-            "pagination": {
-                "page": page,
-                "limit": limit,
-                "total_docs": total_docs,
-                "total_pages": total_pages
-            }
-        }
-    except Exception as e:
-        raise HTTPException(500, str(e))
-
-@app.get("/api/admin/export")
-async def get_export_data(request: Request):
-    auth_header = request.headers.get("X-Admin-Key")
-    if auth_header != ADMIN_SECRET:
-        raise HTTPException(401, "Unauthorized")
-
-    try:
-        cursor = players.find({}, {"_id": 0}).sort("played_at", -1)
-        logs = list(cursor)
-        return {"status": "success", "data": logs}
-    except Exception as e:
-        raise HTTPException(500, str(e))
-
-@app.post("/api/play")
+@app.post("/api/play", dependencies=[Depends(check_rate_limit)])
 async def play_gacha(request: Request):
     try:
         system_status = settings.find_one({"key": "system_status"})
@@ -353,14 +392,13 @@ async def play_gacha(request: Request):
         name = data.get("name", "Fan")
         lang = data.get("lang", "th")
         
-        # IP Checking
         client_ip = request.headers.get("X-Forwarded-For") or request.client.host
         if "," in client_ip: client_ip = client_ip.split(",")[0].strip()
         ip_hash = get_ip_hash(client_ip)
 
         # Check Duplicate
-        if players.find_one({"ip_hash": ip_hash}):
-            old = players.find_one({"ip_hash": ip_hash})
+        old = players.find_one({"ip_hash": ip_hash})
+        if old:
             return {
                 "status": "already_played",
                 "data": {
@@ -372,10 +410,9 @@ async def play_gacha(request: Request):
         selected_image = get_random_image(gender)
         blessing = await generate_blessing(name, gender, lang)
 
-        # Insert Record
         players.insert_one({
             "ip_hash": ip_hash,
-            "ip_address": client_ip, 
+            "ip_address": client_ip,
             "gender": gender,
             "name": name,
             "image_file": selected_image,
@@ -408,10 +445,8 @@ async def delete_history(ip_hash: str, request: Request):
     auth_header = request.headers.get("X-Admin-Key")
     if auth_header != ADMIN_SECRET:
         raise HTTPException(401, "Unauthorized")
-    result = players.delete_one({"ip_hash": ip_hash})
-    if result.deleted_count == 1:
-        return {"status": "deleted"}
-    raise HTTPException(404, "Record not found")
+    players.delete_one({"ip_hash": ip_hash})
+    return {"status": "deleted"}
 
 # --- Frontend Serving ---
 if os.path.exists(os.path.join(STATIC_DIR, "assets")):
