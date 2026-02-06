@@ -86,9 +86,9 @@ export default function Admin() {
     try {
         const res = await fetch('/api/admin/export', { headers: { 'X-Admin-Key': secretKey } })
         const json = await res.json()
-        const headers = ["Timestamp", "Name", "Gender", "IP Address", "IP Hash", "Message", "Blessing", "Image File"];
+        const headers = ["Timestamp", "Name", "Gender", "Rarity", "IP Address", "IP Hash", "Message", "Blessing", "Image File"];
         const rows = json.data.map(r => [
-            new Date(r.played_at).toLocaleString('en-US'), `"${r.name.replace(/"/g, '""')}"`, r.gender, r.ip_address || "N/A", r.ip_hash,
+            new Date(r.played_at).toLocaleString('en-US'), `"${r.name.replace(/"/g, '""')}"`, r.gender, r.rarity || "R", r.ip_address || "N/A", r.ip_hash,
             `"${(r.blessing||"").replace(/"/g, '""').replace(/\n/g, ' ')}"`, r.image_file
         ]);
         const csvContent = "\uFEFF" + [headers.join(","), ...rows.map(e => e.join(","))].join("\n");
@@ -134,12 +134,17 @@ export default function Admin() {
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
             <div className="overflow-x-auto">
                 <table className="w-full text-left text-sm">
-                    <thead className="bg-slate-50 border-b border-slate-200 text-slate-500"><tr><th className="px-4 py-4 w-32">Time</th><th className="px-4 py-4 w-48">User</th><th className="px-4 py-4 w-32">IP</th><th className="px-4 py-4">Message</th><th className="px-4 py-4 text-right">Action</th></tr></thead>
+                    <thead className="bg-slate-50 border-b border-slate-200 text-slate-500"><tr><th className="px-4 py-4 w-32">Time</th><th className="px-4 py-4 w-48">User</th><th className="px-4 py-4 w-16 text-center">Rank</th><th className="px-4 py-4 w-32">IP</th><th className="px-4 py-4">Message</th><th className="px-4 py-4 text-right">Action</th></tr></thead>
                     <tbody className="divide-y divide-slate-100">
                         {data.map((log, i) => (
                             <tr key={i} className="hover:bg-slate-50">
                                 <td className="px-4 py-4 text-xs text-slate-400">{new Date(log.played_at).toLocaleString()}</td>
                                 <td className="px-4 py-4 font-bold">{log.name} <span className="text-[10px] font-normal text-slate-400">({log.gender})</span></td>
+                                <td className="px-4 py-4 text-center">
+                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${log.rarity === 'SSR' ? 'bg-yellow-100 text-yellow-600' : log.rarity === 'SR' ? 'bg-slate-100 text-slate-600' : 'bg-pink-50 text-pink-400'}`}>
+                                        {log.rarity || 'R'}
+                                    </span>
+                                </td>
                                 <td className="px-4 py-4 text-xs font-mono">{log.ip_address}</td>
                                 <td className="px-4 py-4 text-xs italic text-slate-600 truncate max-w-xs">{log.blessing}</td>
                                 <td className="px-4 py-4 text-right">

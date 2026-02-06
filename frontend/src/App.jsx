@@ -1,8 +1,5 @@
-import { useState, useEffect } from 'react'
-import Admin from './Admin'
-import NotFound from './NotFound'
-import './App.css'
-import { Sparkles, Download, User, Info, CheckCircle2, Heart, Maximize2, X, Twitter, Globe } from 'lucide-react'
+import { useState } from 'react'
+import { Sparkles, Download, User, Info, CheckCircle2, Heart, Twitter, Globe } from 'lucide-react'
 import confetti from 'canvas-confetti'
 
 const TRANSLATIONS = {
@@ -24,7 +21,6 @@ const TRANSLATIONS = {
     start_btn: "Start Gacha ✨",
     cancel_btn: "Cancel",
     loading_texts: ['กำลังเชื่อมต่อ...', 'เช็คสิทธิ์การเล่น...', 'กำลังห่อของขวัญ...', 'เสร็จสิ้น...'],
-    ssr_badge: "SSR",
     special_msg: "Special Message",
     save_btn: "SAVE",
     share_btn: "POST TO X",
@@ -54,7 +50,6 @@ const TRANSLATIONS = {
     start_btn: "Start Gacha ✨",
     cancel_btn: "Cancel",
     loading_texts: ["Connecting...","Checking eligibility...","Wrapping your gift...","Almost done..."],
-    ssr_badge: "SSR",
     special_msg: "Special Message",
     save_btn: "SAVE",
     share_btn: "POST TO X",
@@ -68,14 +63,7 @@ const TRANSLATIONS = {
   }
 }
 
-function App() {
-  let path = window.location.pathname;
-  if (path.endsWith('/') && path.length > 1) path = path.slice(0, -1);
-  try { path = decodeURIComponent(path); } catch (e) {}
-
-  if (path === '/@jaiidees_only') return <Admin />;
-  if (path !== '/' && path !== '/index.html') return <NotFound />;
-
+export default function Home() {
   const [lang, setLang] = useState('th')
   const t = TRANSLATIONS[lang]
 
@@ -156,6 +144,30 @@ function App() {
         }
     }
     window.open(url, '_blank');
+  }
+
+  // --- RARITY BADGE LOGIC ---
+  const getRarityBadge = (rarity) => {
+    if (rarity === 'SSR') {
+        return (
+            <div className="absolute top-4 right-4 bg-gradient-to-r from-yellow-300 via-amber-400 to-yellow-500 text-white shadow-lg shadow-amber-200 px-3 py-1 rounded-full flex items-center gap-1.5 animate-pulse">
+                <Sparkles size={12} className="text-white" />
+                <span className="text-[10px] font-black tracking-widest drop-shadow-sm">SSR</span>
+            </div>
+        )
+    } else if (rarity === 'SR') {
+        return (
+            <div className="absolute top-4 right-4 bg-gradient-to-r from-slate-300 via-slate-400 to-slate-500 text-white shadow-lg shadow-slate-200 px-3 py-1 rounded-full flex items-center gap-1.5">
+                <span className="text-[10px] font-black tracking-widest drop-shadow-sm">SR</span>
+            </div>
+        )
+    } else {
+        return (
+            <div className="absolute top-4 right-4 bg-pink-100 text-pink-600 border border-pink-200 shadow-sm px-3 py-1 rounded-full flex items-center gap-1.5">
+                <span className="text-[10px] font-bold tracking-widest">R</span>
+            </div>
+        )
+    }
   }
 
   return (
@@ -273,9 +285,8 @@ function App() {
             <div className="bg-white border border-white rounded-3xl overflow-hidden shadow-2xl shadow-blue-100/50 relative group">
               <div className="relative w-full aspect-[9/16] bg-slate-100">
                 <img src={result.image_url} alt="Result" className="w-full h-full object-cover" />
-                <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-md border border-white shadow-sm px-3 py-1 rounded-full flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-pink-500 animate-pulse"></span><span className="text-[10px] font-bold text-pink-600 tracking-wider">CARD</span>
-                </div>
+                {/* Rarity Badge */}
+                {getRarityBadge(result.rarity)}
               </div>
               <div className="p-6 bg-white relative">
                 <div className="mb-6">
@@ -312,5 +323,4 @@ function App() {
       </footer>
     </div>
   )
-}
-export default App
+} 

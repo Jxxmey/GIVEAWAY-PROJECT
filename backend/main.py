@@ -168,7 +168,16 @@ def get_random_image(gender: str):
         else:
             weights.append(80)
             
-    return random.choices(files, weights=weights, k=1)[0]
+    selected_file = random.choices(files, weights=weights, k=1)[0]
+    
+    # Determine Rarity for frontend badge
+    rarity = "R"
+    if "SSR" in selected_file.upper():
+        rarity = "SSR"
+    elif "SR" in selected_file.upper():
+        rarity = "SR"
+        
+    return selected_file, rarity
 
 async def generate_blessing(name: str, gender: str, lang: str):
     backup_list = BACKUP_MESSAGES_EN if lang == 'en' else BACKUP_MESSAGES_TH
@@ -271,11 +280,12 @@ async def play_gacha(request: Request):
                 "status": "already_played",
                 "data": {
                     "image_url": f"/api/image/{old['gender']}/{old['image_file']}",
-                    "blessing": old['blessing']
+                    "blessing": old['blessing'],
+                    "rarity": old.get("rarity", "R")
                 }
             }
 
-        selected_image = get_random_image(gender)
+        selected_image, rarity = get_random_image(gender)
         blessing = await generate_blessing(name, gender, lang)
 
         players.insert_one({
@@ -284,6 +294,7 @@ async def play_gacha(request: Request):
             "gender": gender,
             "name": name,
             "image_file": selected_image,
+            "rarity": rarity,
             "blessing": blessing,
             "played_at": datetime.now()
         })
@@ -292,7 +303,8 @@ async def play_gacha(request: Request):
             "status": "success",
             "data": {
                 "image_url": f"/api/image/{gender}/{selected_image}",
-                "blessing": blessing
+                "blessing": blessing,
+                "rarity": rarity
             }
         }
     except Exception as e:
