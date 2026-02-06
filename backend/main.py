@@ -109,12 +109,12 @@ STATIC_DIR = "/app/static"
 
 # Backup Messages
 BACKUP_MESSAGES_TH = [
-    "ขอบคุณที่มาร่วมสนุกกับโปรเจกต์เล็กๆ ของเรานะ! ดีใจที่ได้เจอกันในงาน Riser Concert ขอให้วันนี้เป็นวันที่ใจฟู ได้โมเมนต์กลับไปเยอะๆ และเดินทางกลับบ้านปลอดภัยนะ\n\n\"Music is the strongest form of magic.\"",
-    "ฮัลโหลลล! ขอบคุณที่แวะมาเล่นกิจกรรม Fan Project นะคะ ดีใจมากที่เราชอบศิลปินคนเดียวกัน ขอให้วันนี้มีความสุขสุดๆ เก็บความทรงจำดีๆ กลับไปให้เต็มกระเป๋าเลย!\n\n\"Where words fail, music speaks.\""
+    "ขอบคุณที่แวะมาหากันน้า! ขอให้วันนี้เป็นวันที่ใจฟูสุดๆ เจอกันในคอนฯ น้า 💖✨",
+    "เย้! ดีใจที่ได้เจอกันนะเตง ขอให้ได้โมเมนต์ดีๆ กลับไปเพียบเลย! สู้ๆ 🫶🥺"
 ]
 BACKUP_MESSAGES_EN = [
-    "Thanks for stopping by our Fan Project gacha! So happy we share the same love for the artist at Riser Concert. Hope your heart is full of joy today. Safe travels home!\n\n\"Music is the strongest form of magic.\"",
-    "Hello fellow fan! Thank you for joining our small project. Wishing you the best moments. Have a safe trip back!\n\n\"Where words fail, music speaks.\""
+    "Thanks for dropping by, bestie! Hope you have the most magical time at the concert! 💖✨",
+    "Yay! So happy to see you. Wishing you lots of happy moments today! Enjoy! 🫶🥺"
 ]
 
 # --- 2. Background Tasks ---
@@ -184,25 +184,37 @@ async def generate_blessing(name: str, gender: str, lang: str):
     if not client_ai:
         return random.choice(backup_list)
     
+    # --- UPDATED PROMPT HERE ---
     try:
         prompt = f"""
-        Role: Fan Project (@Jaiidees) Representative.
-        Tone: Warm, friendly, sweet.
+        Role: A cheerful and supportive fan club member talking to another fan (Bestie vibes).
+        Tone: Super cute, warm, enthusiastic, friendly, and encouraging. Use Emoji and Kaomoji freely (e.g., 💖, ✨, 🥺, 🫶, >_<).
         Language: {'English' if lang == 'en' else 'Thai'}.
-        Input: Fan name "{name}", Bias side "{gender}".
-        Task: Write a short, heartwarming thank you note (3-4 lines) for joining the gacha. End with a short music quote.
+        
+        Context: 
+        - Event: Riser Concert.
+        - User Name: '{name}'.
+        - User's Bias Side: '{gender}' side (Boy/Girl).
+        
+        Task: 
+        Write a short message (max 3 lines) to thank '{name}' for joining our Fan Project.
+        Wish them happiness, good luck with collecting moments, or safe travels.
+        Make it feel like a handwritten note passed between close fangirl friends.
+        
+        Example Output Style:
+        "ขอบคุณที่แวะมาเล่นกันนะเตง! 💖 ดีใจที่ชอบเหมือนกัน ขอให้วันนี้เป็นวันที่ดีสุดๆ ไปเลยน้า ✨🥺 รักนะจุ๊บๆ"
         """
+        
         response = await asyncio.wait_for(
             client_ai.aio.models.generate_content(
-                model=AI_MODEL_NAME,
+                model=AI_MODEL_NAME, 
                 contents=prompt,
-                config=types.GenerateContentConfig(temperature=0.8)
-            ),
+                config=types.GenerateContentConfig(temperature=0.85) # Increased temp for more creativity
+            ), 
             timeout=5.0
         )
         return response.text.strip()
-    except Exception:
-        return random.choice(backup_list)
+    except: return random.choice(backup_list)
 
 # --- 4. API Routes ---
 
@@ -337,4 +349,4 @@ async def serve_spa(full_path: str):
     file_path = os.path.join(STATIC_DIR, full_path)
     if os.path.exists(file_path) and os.path.isfile(file_path):
         return FileResponse(file_path)
-    return FileResponse(os.path.join(STATIC_DIR, "index.html")) 
+    return FileResponse(os.path.join(STATIC_DIR, "index.html"))
