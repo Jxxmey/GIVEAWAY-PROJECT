@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Lock, Database, Clock, LogOut, Trash2, FileDown, Power, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Lock, Database, Clock, LogOut, Trash2, FileDown, Power, RefreshCw, ChevronLeft, ChevronRight, X, AlertTriangle } from 'lucide-react'
 
 export default function Admin() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
@@ -8,6 +8,9 @@ export default function Admin() {
   const [loading, setLoading] = useState(false)
   const [systemActive, setSystemActive] = useState(false)
   
+  // Modal State
+  const [showToggleModal, setShowToggleModal] = useState(false)
+
   // Pagination State
   const [page, setPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
@@ -61,12 +64,12 @@ export default function Admin() {
   const handleRefresh = () => fetchAllData(secretKey, page)
   const handleLogout = () => { localStorage.removeItem('admin_key'); setIsAuthenticated(false); setSecretKey('') }
   
-  const toggleSystem = async () => {
-      if (!window.confirm("ยืนยันเปลี่ยนสถานะระบบ (เปิด/ปิด)?")) return;
+  const confirmToggleSystem = async () => {
       try {
           const res = await fetch('/api/admin/toggle_system', { method: 'POST', headers: { 'X-Admin-Key': secretKey } })
           const data = await res.json()
           setSystemActive(data.is_active)
+          setShowToggleModal(false) // Close Modal
       } catch (err) { alert("Error") }
   }
 
@@ -109,7 +112,7 @@ export default function Admin() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 font-sans text-slate-800">
+    <div className="min-h-screen bg-slate-50 font-sans text-slate-800 relative">
       <nav className="bg-white border-b border-slate-200 px-6 py-4 flex justify-between items-center sticky top-0 z-50 shadow-sm">
         <div className="flex items-center gap-4">
           <div className="bg-blue-100 p-2 rounded-lg text-blue-600"><Database size={20} /></div>
@@ -118,7 +121,11 @@ export default function Admin() {
           <button className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-bold bg-blue-50 text-blue-600"><Clock size={16} /> History</button>
         </div>
         <div className="flex items-center gap-2">
-            <div onClick={toggleSystem} className={`cursor-pointer hidden md:flex items-center gap-3 px-4 py-2 rounded-full border transition-all select-none shadow-sm ${systemActive ? 'bg-green-50 border-green-200 text-green-700' : 'bg-red-50 border-red-200 text-red-700'}`}><div className={`w-3 h-3 rounded-full ${systemActive ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`}></div><span className="text-xs font-bold uppercase tracking-wide">{systemActive ? 'ONLINE' : 'OFFLINE'}</span><Power size={14} /></div>
+            <button onClick={() => setShowToggleModal(true)} className={`cursor-pointer hidden md:flex items-center gap-3 px-4 py-2 rounded-full border transition-all select-none shadow-sm hover:brightness-95 ${systemActive ? 'bg-green-50 border-green-200 text-green-700' : 'bg-red-50 border-red-200 text-red-700'}`}>
+                <div className={`w-3 h-3 rounded-full ${systemActive ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`}></div>
+                <span className="text-xs font-bold uppercase tracking-wide">{systemActive ? 'ONLINE' : 'OFFLINE'}</span>
+                <Power size={14} />
+            </button>
             <button onClick={handleRefresh} className="p-2 rounded-full bg-slate-100 text-slate-600 hover:text-blue-600"><RefreshCw size={16} className={loading ? 'animate-spin' : ''} /></button>
             <button onClick={exportToCSV} className="flex items-center gap-2 text-xs font-bold text-green-700 bg-green-50 px-3 py-2 rounded-lg border border-green-200 hover:bg-green-100"><FileDown size={14} /> CSV</button>
             <button onClick={handleLogout} className="flex items-center gap-2 text-xs font-bold text-red-500 px-3 py-2 rounded-lg border border-red-100 hover:bg-red-50"><LogOut size={14} /> Logout</button>
@@ -153,6 +160,35 @@ export default function Admin() {
             </div>
         </div>
       </main>
+
+      {/* --- CONFIRMATION MODAL (POPUP) --- */}
+      {showToggleModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm animate-fade-in" onClick={() => setShowToggleModal(false)}></div>
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xs relative z-10 overflow-hidden animate-zoom-in">
+                <div className={`h-2 w-full ${systemActive ? 'bg-red-500' : 'bg-green-500'}`}></div>
+                <div className="p-6 text-center">
+                    <div className={`w-16 h-16 mx-auto rounded-full flex items-center justify-center mb-4 ${systemActive ? 'bg-red-50 text-red-500' : 'bg-green-50 text-green-500'}`}>
+                        <Power size={32} />
+                    </div>
+                    <h3 className="text-lg font-bold text-slate-800 mb-2">
+                        {systemActive ? 'ต้องการปิดระบบ?' : 'ต้องการเปิดระบบ?'}
+                    </h3>
+                    <p className="text-sm text-slate-500 mb-6 leading-relaxed">
+                        {systemActive 
+                            ? 'หากปิดระบบ ผู้ใช้งานจะไม่สามารถเข้าเล่นกิจกรรมได้จนกว่าจะเปิดใหม่' 
+                            : 'หากเปิดระบบ ผู้ใช้งานจะสามารถเข้าเล่นกิจกรรมได้ทันที'}
+                    </p>
+                    <div className="flex gap-3">
+                        <button onClick={() => setShowToggleModal(false)} className="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-bold hover:bg-slate-50 transition-colors">ยกเลิก</button>
+                        <button onClick={confirmToggleSystem} className={`flex-1 py-2.5 rounded-xl text-white font-bold shadow-lg transition-all ${systemActive ? 'bg-red-500 hover:bg-red-600 shadow-red-200' : 'bg-green-500 hover:bg-green-600 shadow-green-200'}`}>
+                            {systemActive ? 'ยืนยันปิด' : 'ยืนยันเปิด'}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+      )}
     </div>
   )
 }
