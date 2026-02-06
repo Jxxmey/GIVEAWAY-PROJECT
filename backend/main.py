@@ -56,18 +56,17 @@ async def check_rate_limit(request: Request):
     client_ip = request.headers.get("X-Forwarded-For") or request.client.host
     if "," in client_ip: client_ip = client_ip.split(",")[0].strip()
     
-    # Limit: 10 requests per minute for API calls (Adjust as needed)
+    # Limit: 20 requests per minute for API calls
     if not rate_limiter.is_allowed(client_ip, limit=20, window=60):
         raise HTTPException(status_code=429, detail="Too Many Requests")
     return True
 
 # --- Security: CORS ---
-# Production: Should restrict to your frontend domain
 origins = [
     "http://localhost:5173",
     "http://localhost:4173",
     SELF_URL,
-    "*" # Keep * for development, change to specific domains in production
+    "*" 
 ]
 
 app.add_middleware(
@@ -182,7 +181,6 @@ def get_random_image(gender: str):
         raise HTTPException(500, "No images found")
     
     # Weight Logic: SSR (5%), SR (15%), Common (80%)
-    # Checks filename for keywords. Default is Common.
     weights = []
     for f in files:
         fname = f.upper()
@@ -228,8 +226,6 @@ async def websocket_endpoint(websocket: WebSocket):
     try:
         while True:
             data = await websocket.receive_json()
-            # Expected format: {"session_id": "...", "text": "...", "sender": "user", "name": "..."}
-            
             session_id = data.get("session_id")
             text = data.get("text")
             sender = data.get("sender", "user")
@@ -239,10 +235,9 @@ async def websocket_endpoint(websocket: WebSocket):
                 msg_obj = {
                     "sender": sender,
                     "text": text,
-                    "timestamp": datetime.now().isoformat() # Send as string for JSON
+                    "timestamp": datetime.now().isoformat()
                 }
                 
-                # Save to DB
                 existing = chats.find_one({"session_id": session_id})
                 if existing:
                     chats.update_one(
@@ -262,10 +257,6 @@ async def websocket_endpoint(websocket: WebSocket):
                         "messages": [msg_obj]
                     })
                 
-                # Broadcast back to everyone (or filter logic if needed)
-                # For simplicity in this project: Broadcast to all admins & the specific user
-                # Here we simply broadcast to everyone connected to the socket to update UI
-                # Real-world: You might want to filter by session_id, but for simple admin chat, this works.
                 data["timestamp"] = msg_obj["timestamp"]
                 await manager.broadcast(data)
                 
@@ -278,7 +269,6 @@ async def websocket_endpoint(websocket: WebSocket):
 async def get_chat_history(session_id: str):
     chat = chats.find_one({"session_id": session_id}, {"_id": 0})
     if chat:
-        # Convert datetime objects to string for JSON
         msgs = chat.get("messages", [])
         for m in msgs:
             if isinstance(m.get("timestamp"), datetime):
@@ -286,7 +276,6 @@ async def get_chat_history(session_id: str):
         return {"status": "success", "data": msgs}
     return {"status": "empty", "data": []}
 
-# Deprecated: HTTP Send (Fallback)
 @app.post("/api/chat/send", dependencies=[Depends(check_rate_limit)])
 async def send_chat_http(request: Request):
     return {"status": "use_websocket_instead"}
@@ -316,7 +305,6 @@ async def admin_reply(request: Request):
             }
         )
         
-        # Broadcast via WebSocket so user sees it immediately
         await manager.broadcast({
             "session_id": session_id,
             "text": message,
@@ -342,8 +330,8 @@ async def get_all_chats(request: Request):
             "session_id": c["session_id"],
             "name": c.get("name", "Unknown"),
             "last_message": last_msg,
+            "last_updated": c.get("last_updated"), 
             "is_read": c.get("is_read", True),
-            # No full messages list to save bandwidth
         })
     return {"status": "success", "data": chat_list}
 
@@ -373,12 +361,31 @@ async def get_history(request: Request, page: int = 1, limit: int = 100):
     
     skip = (page - 1) * limit
     total_docs = players.count_documents({})
+    total_pages = ceil(total_docs / limit) if limit > 0 else 1 
+    
     cursor = players.find({}, {"_id": 0}).sort("played_at", -1).skip(skip).limit(limit)
     return {
         "status": "success",
         "data": list(cursor),
-        "pagination": {"page": page, "total": total_docs}
+        "pagination": {
+            "page": page, 
+            "total_docs": total_docs,
+            "total_pages": total_pages
+        }
     }
+
+@app.get("/api/admin/export")
+async def get_export_data(request: Request):
+    auth_header = request.headers.get("X-Admin-Key")
+    if auth_header != ADMIN_SECRET:
+        raise HTTPException(401, "Unauthorized")
+
+    try:
+        cursor = players.find({}, {"_id": 0}).sort("played_at", -1)
+        logs = list(cursor)
+        return {"status": "success", "data": logs}
+    except Exception as e:
+        raise HTTPException(500, str(e))
 
 @app.post("/api/play", dependencies=[Depends(check_rate_limit)])
 async def play_gacha(request: Request):
@@ -396,7 +403,6 @@ async def play_gacha(request: Request):
         if "," in client_ip: client_ip = client_ip.split(",")[0].strip()
         ip_hash = get_ip_hash(client_ip)
 
-        # Check Duplicate
         old = players.find_one({"ip_hash": ip_hash})
         if old:
             return {
@@ -445,7 +451,7 @@ async def delete_history(ip_hash: str, request: Request):
     auth_header = request.headers.get("X-Admin-Key")
     if auth_header != ADMIN_SECRET:
         raise HTTPException(401, "Unauthorized")
-    players.delete_one({"ip_hash": ip_hash})get_random_image
+    players.delete_one({"ip_hash": ip_hash})
     return {"status": "deleted"}
 
 # --- Frontend Serving ---
