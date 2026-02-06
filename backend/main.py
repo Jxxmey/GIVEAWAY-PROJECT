@@ -337,4 +337,4 @@ async def serve_spa(full_path: str):
     file_path = os.path.join(STATIC_DIR, full_path)
     if os.path.exists(file_path) and os.path.isfile(file_path):
         return FileResponse(file_path)
-    return FileResponse(os.path.join(STATIC_DIR, "index.html"))
+    return FileResponse(os.path.join(STATIC_DIR, "index.html")) 

@@ -1,6 +1,8 @@
-import { useState } from 'react'
-// เพิ่ม Maximize2 และ X เข้ามาใน import
-import { Sparkles, Download, User, Info, CheckCircle2, Heart, Maximize2, X, Twitter, Globe } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import Admin from './Admin'
+import NotFound from './NotFound'
+import './App.css'
+import { Sparkles, Download, User, Info, CheckCircle2, Heart, Twitter, Globe } from 'lucide-react'
 import confetti from 'canvas-confetti'
 
 const TRANSLATIONS = {
@@ -64,7 +66,19 @@ const TRANSLATIONS = {
   }
 }
 
-export default function Home() {
+function App() {
+  // --- ROUTING LOGIC ---
+  let path = window.location.pathname;
+  if (path.endsWith('/') && path.length > 1) path = path.slice(0, -1);
+  try { path = decodeURIComponent(path); } catch (e) {}
+
+  // If Admin Path
+  if (path === '/@jaiidees_only') return <Admin />;
+  
+  // If Not Home or Index
+  if (path !== '/' && path !== '/index.html') return <NotFound />;
+
+  // --- GAME LOGIC ---
   const [lang, setLang] = useState('th')
   const t = TRANSLATIONS[lang]
 
@@ -147,7 +161,7 @@ export default function Home() {
     window.open(url, '_blank');
   }
 
-  // --- RARITY BADGE LOGIC ---
+  // --- RARITY BADGE ---
   const getRarityBadge = (rarity) => {
     if (rarity === 'SSR') {
         return (
@@ -325,3 +339,4 @@ export default function Home() {
     </div>
   )
 }
+export default App

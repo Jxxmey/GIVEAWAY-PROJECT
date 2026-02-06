@@ -198,7 +198,7 @@ export default function Admin() {
                     <div className="flex gap-3">
                         <button onClick={() => setShowToggleModal(false)} className="flex-1 py-3 rounded-xl border border-slate-200 text-slate-600 font-bold hover:bg-slate-50 transition-colors">ยกเลิก</button>
                         <button onClick={confirmToggleSystem} className={`flex-1 py-3 rounded-xl text-white font-bold shadow-lg transition-all ${systemActive ? 'bg-red-500 hover:bg-red-600 shadow-red-200' : 'bg-green-500 hover:bg-green-600 shadow-green-200'}`}>
-                            {systemActive ? 'ยืนยันปิดระบบ' : 'ยืนยันเปิดระบบ'}
+                            {systemActive ? 'ปิดเดี๋ยวนี้' : 'เปิดใช้งาน'}
                         </button>
                     </div>
                 </div>
