@@ -1,8 +1,8 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import Admin from './Admin'
 import NotFound from './NotFound'
 import './App.css'
-import { Sparkles, Download, User, Info, CheckCircle2, Heart, Maximize2, X, Twitter, Globe, MessageCircle, Send } from 'lucide-react'
+import { Sparkles, Download, User, Info, CheckCircle2, Heart, Maximize2, X, Twitter, Globe } from 'lucide-react'
 import confetti from 'canvas-confetti'
 
 const TRANSLATIONS = {
@@ -34,12 +34,7 @@ const TRANSLATIONS = {
     alert_closed: "⛔ กิจกรรมปิดปรับปรุงชั่วคราว",
     share_alert_success: "✅ คัดลอกรูปแล้ว! กด Paste ใน X ได้เลย",
     share_alert_fail: "📸 อย่าลืมแนบรูปที่ Save ไว้ไปอวดเพื่อนๆ นะ!",
-    share_text: "สุ่มกาชา Riser Concert ได้รูปสวยมาก! 🔮✨\n\nมาเล่นกันที่ Fan Project by @Jaiidees\n\n#RiserConcert #JaiideesGiveaway",
-    chat_title: "แชทกับแอดมิน (Live)",
-    chat_placeholder: "พิมพ์ข้อความ...",
-    chat_contact: "ชื่อของคุณ",
-    chat_send: "ส่ง",
-    chat_admin_name: "Admin @Jaiidees"
+    share_text: "สุ่มกาชา Riser Concert ได้รูปสวยมาก! 🔮✨\n\nมาเล่นกันที่ Fan Project by @Jaiidees\n\n#RiserConcert #JaiideesGiveaway"
   },
   en: {
     subtitle: "Fan Project by @Jaiidees",
@@ -69,12 +64,7 @@ const TRANSLATIONS = {
     alert_closed: "⛔ Event is temporarily closed.",
     share_alert_success: "✅ Image copied! Paste it in X.",
     share_alert_fail: "📸 Don’t forget to attach the saved image!",
-    share_text: "I just got an amazing wallpaper from Riser Concert Gacha! 🔮✨\n\nJoin Fan Project by @Jaiidees\n\n#RiserConcert #JaiideesGiveaway",
-    chat_title: "Chat with Admin (Live)",
-    chat_placeholder: "Type your message...",
-    chat_contact: "Your Name",
-    chat_send: "Send",
-    chat_admin_name: "Admin @Jaiidees"
+    share_text: "I just got an amazing wallpaper from Riser Concert Gacha! 🔮✨\n\nJoin Fan Project by @Jaiidees\n\n#RiserConcert #JaiideesGiveaway"
   }
 }
 
@@ -94,65 +84,6 @@ function App() {
   const [result, setResult] = useState(null)
   const [loadingText, setLoadingText] = useState('Initializing...')
   const [showExample, setShowExample] = useState(false)
-  
-  // --- WEBSOCKET CHAT STATE ---
-  const [showChat, setShowChat] = useState(false)
-  const [chatMsg, setChatMsg] = useState('')
-  const [chatHistory, setChatHistory] = useState([])
-  const [sessionId, setSessionId] = useState('')
-  const [isConnected, setIsConnected] = useState(false)
-  const ws = useRef(null)
-  const chatEndRef = useRef(null)
-
-  // 1. Setup Session ID
-  useEffect(() => {
-    let sid = localStorage.getItem('chat_session_id')
-    if (!sid) {
-        sid = 'sess_' + Math.random().toString(36).substr(2, 9)
-        localStorage.setItem('chat_session_id', sid)
-    }
-    setSessionId(sid)
-  }, [])
-
-  // 2. Connect WebSocket
-  useEffect(() => {
-    if (!showChat || !sessionId) return;
-
-    // Fetch old history first
-    fetch(`/api/chat/history/${sessionId}`)
-        .then(res => res.json())
-        .then(data => {
-            if(data.status === 'success') setChatHistory(data.data)
-        })
-        .catch(console.error)
-
-    // WebSocket Connection
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${window.location.host}/ws/chat`;
-    
-    ws.current = new WebSocket(wsUrl);
-
-    ws.current.onopen = () => {
-        console.log("WS Connected");
-        setIsConnected(true);
-    };
-
-    ws.current.onmessage = (event) => {
-        const msg = JSON.parse(event.data);
-        setChatHistory(prev => [...prev, msg])
-    };
-
-    ws.current.onclose = () => setIsConnected(false);
-
-    return () => {
-        if(ws.current) ws.current.close();
-    }
-  }, [showChat, sessionId])
-
-  // Scroll to bottom
-  useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: "smooth" })
-  }, [chatHistory, showChat])
 
   // --- HANDLERS ---
   const toggleLang = () => setLang(prev => prev === 'th' ? 'en' : 'th')
@@ -201,20 +132,6 @@ function App() {
       alert("Server connection failed.")
       setStep('landing')
     }
-  }
-
-  const handleSendChat = () => {
-    if (!chatMsg.trim() || !ws.current) return;
-    
-    const payload = {
-        session_id: sessionId,
-        text: chatMsg,
-        sender: 'user',
-        name: formData.name || "Fan"
-    }
-    
-    ws.current.send(JSON.stringify(payload));
-    setChatMsg('')
   }
 
   const triggerConfetti = () => {
@@ -375,60 +292,6 @@ function App() {
           </div>
         )}
       </main>
-
-      {/* --- CHAT BUBBLE & WINDOW (WEBSOCKET ENABLED) --- */}
-      <div className="fixed bottom-4 right-4 z-[60]">
-        {!showChat ? (
-          <button 
-            onClick={() => setShowChat(true)}
-            className="w-12 h-12 bg-gradient-to-tr from-pink-500 to-purple-500 rounded-full flex items-center justify-center text-white shadow-lg hover:scale-110 transition-transform relative"
-          >
-            <MessageCircle size={24} />
-            {/* Online Indicator */}
-            <span className={`absolute top-0 right-0 w-3 h-3 rounded-full border-2 border-white ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}></span>
-          </button>
-        ) : (
-            <div className="bg-white rounded-2xl shadow-2xl w-80 h-96 border border-slate-200 overflow-hidden flex flex-col animate-zoom-in">
-                {/* Header */}
-                <div className="bg-slate-100 p-3 border-b border-slate-200 flex justify-between items-center">
-                    <div className="flex items-center gap-2">
-                        <span className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}></span>
-                        <span className="text-xs font-bold text-slate-700">{t.chat_title}</span>
-                    </div>
-                    <button onClick={() => setShowChat(false)} className="text-slate-400 hover:text-slate-600"><X size={16} /></button>
-                </div>
-                
-                {/* Messages List */}
-                <div className="flex-1 overflow-y-auto p-3 space-y-3 bg-slate-50">
-                    {chatHistory.map((msg, i) => (
-                        <div key={i} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
-                            <div className={`max-w-[80%] p-2 rounded-lg text-xs ${msg.sender === 'user' ? 'bg-pink-500 text-white rounded-tr-none' : 'bg-white border border-slate-200 text-slate-700 rounded-tl-none'}`}>
-                                {msg.sender === 'admin' && <div className="font-bold text-[10px] text-pink-600 mb-1">{t.chat_admin_name}</div>}
-                                {msg.text}
-                            </div>
-                        </div>
-                    ))}
-                    <div ref={chatEndRef}></div>
-                </div>
-                
-                {/* Input Area */}
-                <div className="p-2 border-t border-slate-200 bg-white flex gap-2">
-                    <input 
-                        type="text" 
-                        placeholder={t.chat_placeholder} 
-                        className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-pink-400"
-                        value={chatMsg}
-                        onChange={(e) => setChatMsg(e.target.value)}
-                        onKeyDown={(e) => e.key === 'Enter' && handleSendChat()}
-                        disabled={!isConnected}
-                    />
-                    <button onClick={handleSendChat} disabled={!isConnected} className="bg-pink-500 text-white p-2 rounded-lg hover:bg-pink-600 transition-colors disabled:bg-slate-300">
-                        <Send size={16} />
-                    </button>
-                </div>
-            </div>
-        )}
-      </div>
 
       {/* Example Modal */}
       {showExample && (

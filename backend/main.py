@@ -8,7 +8,7 @@ from math import ceil
 from datetime import datetime
 from typing import List, Dict
 from bson import ObjectId
-from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect, Depends
+from fastapi import FastAPI, HTTPException, Request, Depends
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -82,10 +82,9 @@ try:
     db = client_db['riser_gacha']
     players = db['players']
     settings = db['settings']
-    chats = db['chats']
+    # chats collection removed
     
     players.create_index("ip_hash", unique=True)
-    chats.create_index("session_id", unique=True)
     
     if not settings.find_one({"key": "system_status"}):
         settings.insert_one({"key": "system_status", "is_active": False})
@@ -118,29 +117,7 @@ BACKUP_MESSAGES_EN = [
     "Hello fellow fan! Thank you for joining our small project. Wishing you the best moments. Have a safe trip back!\n\n\"Where words fail, music speaks.\""
 ]
 
-# --- 2. WebSocket Connection Manager (Real-time Chat) ---
-class ConnectionManager:
-    def __init__(self):
-        self.active_connections: List[WebSocket] = []
-
-    async def connect(self, websocket: WebSocket):
-        await websocket.accept()
-        self.active_connections.append(websocket)
-
-    def disconnect(self, websocket: WebSocket):
-        if websocket in self.active_connections:
-            self.active_connections.remove(websocket)
-
-    async def broadcast(self, message: dict):
-        for connection in self.active_connections:
-            try:
-                await connection.send_json(message)
-            except:
-                self.disconnect(connection)
-
-manager = ConnectionManager()
-
-# --- 3. Background Tasks ---
+# --- 2. Background Tasks ---
 
 @app.get("/api/health")
 async def health_check():
@@ -161,7 +138,7 @@ async def keep_alive_ping():
 async def startup_event():
     asyncio.create_task(keep_alive_ping())
 
-# --- 4. Core Logic Helpers ---
+# --- 3. Core Logic Helpers ---
 
 def get_ip_hash(ip: str):
     return hashlib.sha256(ip.encode()).hexdigest()
@@ -218,122 +195,7 @@ async def generate_blessing(name: str, gender: str, lang: str):
     except Exception:
         return random.choice(backup_list)
 
-# --- 5. WebSocket Endpoint (New Chat) ---
-
-@app.websocket("/ws/chat")
-async def websocket_endpoint(websocket: WebSocket):
-    await manager.connect(websocket)
-    try:
-        while True:
-            data = await websocket.receive_json()
-            session_id = data.get("session_id")
-            text = data.get("text")
-            sender = data.get("sender", "user")
-            name = data.get("name", "Fan")
-            
-            if session_id and text:
-                msg_obj = {
-                    "sender": sender,
-                    "text": text,
-                    "timestamp": datetime.now().isoformat()
-                }
-                
-                existing = chats.find_one({"session_id": session_id})
-                if existing:
-                    chats.update_one(
-                        {"session_id": session_id},
-                        {
-                            "$push": {"messages": msg_obj},
-                            "$set": {"last_updated": datetime.now(), "is_read": False, "name": name}
-                        }
-                    )
-                else:
-                    chats.insert_one({
-                        "session_id": session_id,
-                        "name": name,
-                        "created_at": datetime.now(),
-                        "last_updated": datetime.now(),
-                        "is_read": False,
-                        "messages": [msg_obj]
-                    })
-                
-                data["timestamp"] = msg_obj["timestamp"]
-                await manager.broadcast(data)
-                
-    except WebSocketDisconnect:
-        manager.disconnect(websocket)
-
-# --- 6. API Routes ---
-
-@app.get("/api/chat/history/{session_id}")
-async def get_chat_history(session_id: str):
-    chat = chats.find_one({"session_id": session_id}, {"_id": 0})
-    if chat:
-        msgs = chat.get("messages", [])
-        for m in msgs:
-            if isinstance(m.get("timestamp"), datetime):
-                m["timestamp"] = m["timestamp"].isoformat()
-        return {"status": "success", "data": msgs}
-    return {"status": "empty", "data": []}
-
-@app.post("/api/chat/send", dependencies=[Depends(check_rate_limit)])
-async def send_chat_http(request: Request):
-    return {"status": "use_websocket_instead"}
-
-@app.post("/api/admin/reply")
-async def admin_reply(request: Request):
-    auth_header = request.headers.get("X-Admin-Key")
-    if auth_header != ADMIN_SECRET:
-        raise HTTPException(401, "Unauthorized")
-    
-    try:
-        data = await request.json()
-        session_id = data.get("session_id")
-        message = data.get("message")
-        
-        msg_obj = {
-            "sender": "admin",
-            "text": message,
-            "timestamp": datetime.now().isoformat()
-        }
-        
-        chats.update_one(
-            {"session_id": session_id},
-            {
-                "$push": {"messages": msg_obj},
-                "$set": {"is_read": True}
-            }
-        )
-        
-        await manager.broadcast({
-            "session_id": session_id,
-            "text": message,
-            "sender": "admin",
-            "timestamp": msg_obj["timestamp"]
-        })
-        
-        return {"status": "success"}
-    except Exception as e:
-        raise HTTPException(500, str(e))
-
-@app.get("/api/admin/chats")
-async def get_all_chats(request: Request):
-    auth_header = request.headers.get("X-Admin-Key")
-    if auth_header != ADMIN_SECRET:
-        raise HTTPException(401, "Unauthorized")
-    
-    cursor = chats.find({}).sort("last_updated", -1).limit(50)
-    chat_list = []
-    for c in cursor:
-        last_msg = c["messages"][-1]["text"] if c["messages"] else ""
-        chat_list.append({
-            "session_id": c["session_id"],
-            "name": c.get("name", "Unknown"),
-            "last_message": last_msg,
-            "last_updated": c.get("last_updated"), 
-            "is_read": c.get("is_read", True),
-        })
-    return {"status": "success", "data": chat_list}
+# --- 4. API Routes ---
 
 @app.get("/api/admin/system_status")
 async def get_system_status(request: Request):
