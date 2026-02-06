@@ -139,8 +139,6 @@ function App() {
 
     ws.current.onmessage = (event) => {
         const msg = JSON.parse(event.data);
-        // Only append if it's relevant to this session (or generic broadcast)
-        // In this simple app, we just append everything received
         setChatHistory(prev => [...prev, msg])
     };
 
