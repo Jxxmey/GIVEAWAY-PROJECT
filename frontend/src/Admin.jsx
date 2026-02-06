@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Lock, Database, Clock, LogOut, Trash2, FileDown, Power, RefreshCw, ChevronLeft, ChevronRight, X, AlertTriangle } from 'lucide-react'
+import { Lock, Database, Clock, LogOut, Trash2, FileDown, Power, RefreshCw, ChevronLeft, ChevronRight, X } from 'lucide-react'
 
 export default function Admin() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
@@ -112,8 +112,10 @@ export default function Admin() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 font-sans text-slate-800 relative">
-      <nav className="bg-white border-b border-slate-200 px-6 py-4 flex justify-between items-center sticky top-0 z-50 shadow-sm">
+    <div className="min-h-screen bg-slate-50 font-sans text-slate-800 relative pb-20">
+      
+      {/* Navbar */}
+      <nav className="bg-white border-b border-slate-200 px-6 py-4 flex justify-between items-center sticky top-0 z-40 shadow-sm">
         <div className="flex items-center gap-4">
           <div className="bg-blue-100 p-2 rounded-lg text-blue-600"><Database size={20} /></div>
           <div className="hidden md:block"><h1 className="text-sm font-bold text-slate-900">Admin Dashboard</h1><p className="text-[10px] text-slate-500">Records: {totalDocs}</p></div>
@@ -121,17 +123,13 @@ export default function Admin() {
           <button className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-bold bg-blue-50 text-blue-600"><Clock size={16} /> History</button>
         </div>
         <div className="flex items-center gap-2">
-            <button onClick={() => setShowToggleModal(true)} className={`cursor-pointer hidden md:flex items-center gap-3 px-4 py-2 rounded-full border transition-all select-none shadow-sm hover:brightness-95 ${systemActive ? 'bg-green-50 border-green-200 text-green-700' : 'bg-red-50 border-red-200 text-red-700'}`}>
-                <div className={`w-3 h-3 rounded-full ${systemActive ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`}></div>
-                <span className="text-xs font-bold uppercase tracking-wide">{systemActive ? 'ONLINE' : 'OFFLINE'}</span>
-                <Power size={14} />
-            </button>
             <button onClick={handleRefresh} className="p-2 rounded-full bg-slate-100 text-slate-600 hover:text-blue-600"><RefreshCw size={16} className={loading ? 'animate-spin' : ''} /></button>
             <button onClick={exportToCSV} className="flex items-center gap-2 text-xs font-bold text-green-700 bg-green-50 px-3 py-2 rounded-lg border border-green-200 hover:bg-green-100"><FileDown size={14} /> CSV</button>
             <button onClick={handleLogout} className="flex items-center gap-2 text-xs font-bold text-red-500 px-3 py-2 rounded-lg border border-red-100 hover:bg-red-50"><LogOut size={14} /> Logout</button>
         </div>
       </nav>
 
+      {/* Main Content */}
       <main className="max-w-6xl mx-auto p-4 md:p-6">
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
             <div className="overflow-x-auto">
@@ -161,28 +159,41 @@ export default function Admin() {
         </div>
       </main>
 
+      {/* --- FLOATING TOGGLE BUTTON (BOTTOM RIGHT) --- */}
+      <button 
+        onClick={() => setShowToggleModal(true)}
+        className={`fixed bottom-6 right-6 z-50 flex items-center gap-3 px-6 py-4 rounded-full shadow-2xl transition-all duration-300 hover:scale-105 active:scale-95 font-bold text-white border-4 border-white ${systemActive ? 'bg-green-500 hover:bg-green-600 shadow-green-200' : 'bg-red-500 hover:bg-red-600 shadow-red-200'}`}
+      >
+        <div className="relative">
+            <Power size={24} />
+            {systemActive && <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-white rounded-full animate-ping"></span>}
+        </div>
+        <span className="text-sm tracking-wide">{systemActive ? 'SYSTEM ONLINE' : 'SYSTEM OFFLINE'}</span>
+      </button>
+
       {/* --- CONFIRMATION MODAL (POPUP) --- */}
       {showToggleModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
             <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm animate-fade-in" onClick={() => setShowToggleModal(false)}></div>
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xs relative z-10 overflow-hidden animate-zoom-in">
                 <div className={`h-2 w-full ${systemActive ? 'bg-red-500' : 'bg-green-500'}`}></div>
+                <button onClick={() => setShowToggleModal(false)} className="absolute top-3 right-3 text-slate-400 hover:text-slate-600"><X size={20}/></button>
                 <div className="p-6 text-center">
-                    <div className={`w-16 h-16 mx-auto rounded-full flex items-center justify-center mb-4 ${systemActive ? 'bg-red-50 text-red-500' : 'bg-green-50 text-green-500'}`}>
+                    <div className={`w-16 h-16 mx-auto rounded-full flex items-center justify-center mb-4 transition-colors ${systemActive ? 'bg-red-50 text-red-500' : 'bg-green-50 text-green-500'}`}>
                         <Power size={32} />
                     </div>
                     <h3 className="text-lg font-bold text-slate-800 mb-2">
-                        {systemActive ? 'ต้องการปิดระบบ?' : 'ต้องการเปิดระบบ?'}
+                        {systemActive ? 'ยืนยันการปิดระบบ?' : 'ยืนยันการเปิดระบบ?'}
                     </h3>
                     <p className="text-sm text-slate-500 mb-6 leading-relaxed">
                         {systemActive 
-                            ? 'หากปิดระบบ ผู้ใช้งานจะไม่สามารถเข้าเล่นกิจกรรมได้จนกว่าจะเปิดใหม่' 
-                            : 'หากเปิดระบบ ผู้ใช้งานจะสามารถเข้าเล่นกิจกรรมได้ทันที'}
+                            ? 'เมื่อปิดระบบ ผู้ใช้งานจะไม่สามารถเล่นกิจกรรมได้ (สถานะ: Closed)' 
+                            : 'เมื่อเปิดระบบ ผู้ใช้งานจะสามารถเริ่มสุ่มกาชาได้ทันที (สถานะ: Active)'}
                     </p>
                     <div className="flex gap-3">
-                        <button onClick={() => setShowToggleModal(false)} className="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-bold hover:bg-slate-50 transition-colors">ยกเลิก</button>
-                        <button onClick={confirmToggleSystem} className={`flex-1 py-2.5 rounded-xl text-white font-bold shadow-lg transition-all ${systemActive ? 'bg-red-500 hover:bg-red-600 shadow-red-200' : 'bg-green-500 hover:bg-green-600 shadow-green-200'}`}>
-                            {systemActive ? 'ยืนยันปิด' : 'ยืนยันเปิด'}
+                        <button onClick={() => setShowToggleModal(false)} className="flex-1 py-3 rounded-xl border border-slate-200 text-slate-600 font-bold hover:bg-slate-50 transition-colors">ยกเลิก</button>
+                        <button onClick={confirmToggleSystem} className={`flex-1 py-3 rounded-xl text-white font-bold shadow-lg transition-all ${systemActive ? 'bg-red-500 hover:bg-red-600 shadow-red-200' : 'bg-green-500 hover:bg-green-600 shadow-green-200'}`}>
+                            {systemActive ? 'ยืนยันปิดระบบ' : 'ยืนยันเปิดระบบ'}
                         </button>
                     </div>
                 </div>
