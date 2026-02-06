@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react'
 import Admin from './Admin'
 import NotFound from './NotFound'
 import './App.css'
-import { Sparkles, Download, User, Info, CheckCircle2, Heart, Twitter, Globe } from 'lucide-react'
+// เพิ่ม Maximize2 และ X เข้ามาใน import ให้ครบ
+import { Sparkles, Download, User, Info, CheckCircle2, Heart, Maximize2, X, Twitter, Globe } from 'lucide-react'
 import confetti from 'canvas-confetti'
 
 const TRANSLATIONS = {
@@ -66,19 +67,8 @@ const TRANSLATIONS = {
   }
 }
 
-function App() {
-  // --- ROUTING LOGIC ---
-  let path = window.location.pathname;
-  if (path.endsWith('/') && path.length > 1) path = path.slice(0, -1);
-  try { path = decodeURIComponent(path); } catch (e) {}
-
-  // If Admin Path
-  if (path === '/@jaiidees_only') return <Admin />;
-  
-  // If Not Home or Index
-  if (path !== '/' && path !== '/index.html') return <NotFound />;
-
-  // --- GAME LOGIC ---
+// --- GAME COMPONENT (แยกออกมาเพื่อแก้ปัญหา Hook) ---
+function Game() {
   const [lang, setLang] = useState('th')
   const t = TRANSLATIONS[lang]
 
@@ -161,7 +151,7 @@ function App() {
     window.open(url, '_blank');
   }
 
-  // --- RARITY BADGE ---
+  // --- RARITY BADGE LOGIC ---
   const getRarityBadge = (rarity) => {
     if (rarity === 'SSR') {
         return (
@@ -339,4 +329,25 @@ function App() {
     </div>
   )
 }
+
+function App() {
+  // --- ROUTING LOGIC ---
+  let path = window.location.pathname;
+  if (path.endsWith('/') && path.length > 1) path = path.slice(0, -1);
+  try { path = decodeURIComponent(path); } catch (e) {}
+
+  // Route: Admin
+  if (path === '/@jaiidees_only') {
+    return <Admin />
+  }
+
+  // Route: Home (Gacha)
+  if (path === '/' || path === '/index.html') {
+    return <Game />
+  }
+
+  // Route: 404
+  return <NotFound />
+}
+
 export default App
