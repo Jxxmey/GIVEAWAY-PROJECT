@@ -2,20 +2,19 @@ import { useState, useEffect, useRef } from 'react'
 import Admin from './Admin'
 import NotFound from './NotFound'
 import './App.css'
-import { Sparkles, Share2, Download, User, Info, CheckCircle2, Heart, Maximize2, X, Twitter, Gift, Globe, MessageCircle, Send } from 'lucide-react'
+import { Sparkles, Download, User, Info, CheckCircle2, Heart, Maximize2, X, Twitter, Globe, MessageCircle, Send } from 'lucide-react'
 import confetti from 'canvas-confetti'
 
-// --- TRANSLATION DICTIONARY ---
 const TRANSLATIONS = {
   th: {
     subtitle: "Fan Project by @Jaiidees",
     special_giveaway: "Special Giveaway",
     rules_title: "เงื่อนไขและกติกา",
-    rule_1: "จำกัดสิทธิ์การร่วมสนุก 1 ท่าน ต่อ 1 ครั้งเท่านั้น โดยระบบจะทำการตรวจสอบจาก IP Address เพื่อความยุติธรรมของผู้ร่วมกิจกรรมทุกคน",
-    rule_2: "ผู้ร่วมกิจกรรมสามารถเลือกประเภทการ์ดที่ต้องการได้ด้วยตนเอง ก่อนเริ่มกระบวนการสุ่มรางวัล",
-    rule_3: "ของรางวัลประกอบด้วยภาพ Wallpaper แบบ Exclusive และข้อความคำอวยพรพิเศษที่สร้างขึ้นเฉพาะคุณโดย AI",
-    rule_4: "กิจกรรมนี้เป็น Fan Project ที่จัดทำขึ้นเพื่อความบันเทิงสำหรับแฟน ๆ เท่านั้น ไม่มีค่าใช้จ่ายใด ๆ ทั้งสิ้น",
-    rule_5: "ภาพที่ได้รับจากกิจกรรมถือเป็นลิขสิทธิ์ของทางผู้จัดกิจกรรม อนุญาตให้ใช้เพื่อการส่วนตัวเท่านั้น ห้ามนำไปจำหน่ายหรือใช้เชิงพาณิชย์",
+    rule_1: "จำกัดสิทธิ์การร่วมสนุก 1 ท่าน ต่อ 1 ครั้งเท่านั้น โดยระบบจะทำการตรวจสอบจาก IP Address",
+    rule_2: "ผู้ร่วมกิจกรรมสามารถเลือกประเภทการ์ดที่ต้องการได้ด้วยตนเอง (BOY SIDE / GIRL SIDE)",
+    rule_3: "ของรางวัลประกอบด้วยภาพ Wallpaper แบบ Exclusive และข้อความคำอวยพรพิเศษจาก AI",
+    rule_4: "กิจกรรมนี้เป็น Fan Project ที่จัดทำขึ้นเพื่อความบันเทิงสำหรับแฟน ๆ เท่านั้น ไม่มีค่าใช้จ่าย",
+    rule_5: "ภาพที่ได้รับอนุญาตให้ใช้เพื่อการส่วนตัวเท่านั้น ห้ามนำไปจำหน่ายหรือใช้เชิงพาณิชย์",
     example_text: "ตัวอย่างภาพที่จะได้รับ",
     select_team: "เลือกทีมเพื่อเริ่มสุ่ม",
     boy_side: "BOY SIDE",
@@ -29,58 +28,57 @@ const TRANSLATIONS = {
     special_msg: "Special Message",
     save_btn: "SAVE",
     share_btn: "POST TO X",
-    footer_thankyou: "ขอบคุณที่ร่วมสนุกกับกิจกรรม Fan Project ของพวกเรานะครับ สิทธิ์การร่วมกิจกรรมของคุณได้ถูกใช้งานครบเรียบร้อยแล้ว 💖",
+    footer_thankyou: "ขอบคุณที่ร่วมสนุกกับกิจกรรม Fan Project ของพวกเรานะครับ 💖",
     alert_name_required: "⚠️ กรุณากรอกชื่อเล่น หรือ Account X",
-    alert_played: "⚠️ คุณได้ใช้สิทธิ์เข้าร่วมกิจกรรมนี้ไปแล้ว ขอบคุณที่ร่วมสนุกกับ Fan Project ของเรานะครับ 💖",
-    alert_closed: "⛔ ขณะนี้กิจกรรมยังไม่เปิดให้ร่วมสนุก กรุณารอติดตามการเปิดกิจกรรมอย่างเป็นทางการอีกครั้ง",
+    alert_played: "⚠️ คุณได้ใช้สิทธิ์เข้าร่วมกิจกรรมนี้ไปแล้ว ขอบคุณที่ร่วมสนุกครับ 💖",
+    alert_closed: "⛔ กิจกรรมปิดปรับปรุงชั่วคราว",
     share_alert_success: "✅ คัดลอกรูปแล้ว! กด Paste ใน X ได้เลย",
     share_alert_fail: "📸 อย่าลืมแนบรูปที่ Save ไว้ไปอวดเพื่อนๆ นะ!",
     share_text: "สุ่มกาชา Riser Concert ได้รูปสวยมาก! 🔮✨\n\nมาเล่นกันที่ Fan Project by @Jaiidees\n\n#RiserConcert #JaiideesGiveaway",
-    chat_title: "แชทกับแอดมิน (Live Chat)",
+    chat_title: "แชทกับแอดมิน (Live)",
     chat_placeholder: "พิมพ์ข้อความ...",
     chat_contact: "ชื่อของคุณ",
     chat_send: "ส่ง",
     chat_admin_name: "Admin @Jaiidees"
   },
   en: {
-  subtitle: "Fan Project by @Jaiidees",
-  special_giveaway: "Special Giveaway",
-  rules_title: "Terms & Conditions",
-  rule_1: "Limited to one entry per person. Participation is restricted to a single attempt per user, and IP addresses will be checked to ensure fairness.",
-  rule_2: "Participants may select their preferred card type before starting the gacha draw.",
-  rule_3: "Rewards include exclusive wallpaper images and a personalized blessing message generated especially for you by AI.",
-  rule_4: "This activity is a fan-made project created for entertainment purposes only. Participation is completely free of charge.",
-  rule_5: "All images received from this event are copyrighted by the organizer. They are for personal use only and may not be sold or used for commercial purposes.",
-  example_text: "Example Rewards",
-  select_team: "Select a Team to Start",
-  boy_side: "BOY SIDE",
-  girl_side: "GIRL SIDE",
-  form_title: "Registration",
-  form_label: "Nickname / X Account",
-  start_btn: "Start Gacha ✨",
-  cancel_btn: "Cancel",
-  loading_texts: ["Connecting...","Checking eligibility...","Wrapping your gift...","Almost done..."],
-  ssr_badge: "SSR",
-  special_msg: "Special Message",
-  save_btn: "SAVE",
-  share_btn: "POST TO X",
-  footer_thankyou: "Thank you for joining our Fan Project! Your participation quota has been successfully used. 💖",
-  alert_name_required: "⚠️ Please enter your nickname or X account.",
-  alert_played: "⚠️ You have already participated in this event. Thank you for supporting our Fan Project! 💖",
-  alert_closed: "⛔ This event is not open yet. Please stay tuned for the official launch.",
-  share_alert_success: "✅ Image copied! You can now paste it directly into X.",
-  share_alert_fail: "📸 Don’t forget to attach the image you saved when sharing with your friends!",
-  share_text: "I just got an amazing wallpaper from the Riser Concert Gacha! 🔮✨\n\nJoin the fun at Fan Project by @Jaiidees\n\n#RiserConcert #JaiideesGiveaway",
-  chat_title: "Chat with Admin (Live Chat)",
-  chat_placeholder: "Type your message...",
-  chat_contact: "Your Name",
-  chat_send: "Send",
-  chat_admin_name: "Admin @Jaiidees"
-}
+    subtitle: "Fan Project by @Jaiidees",
+    special_giveaway: "Special Giveaway",
+    rules_title: "Terms & Conditions",
+    rule_1: "Limited to one entry per person based on IP Address.",
+    rule_2: "Participants may select their preferred card type (BOY SIDE / GIRL SIDE).",
+    rule_3: "Rewards include exclusive wallpapers and personalized AI messages.",
+    rule_4: "Fan-made project for entertainment only. Free of charge.",
+    rule_5: "Images are for personal use only. Commercial use is prohibited.",
+    example_text: "Example Rewards",
+    select_team: "Select a Team to Start",
+    boy_side: "BOY SIDE",
+    girl_side: "GIRL SIDE",
+    form_title: "Registration",
+    form_label: "Nickname / X Account",
+    start_btn: "Start Gacha ✨",
+    cancel_btn: "Cancel",
+    loading_texts: ["Connecting...","Checking eligibility...","Wrapping your gift...","Almost done..."],
+    ssr_badge: "SSR",
+    special_msg: "Special Message",
+    save_btn: "SAVE",
+    share_btn: "POST TO X",
+    footer_thankyou: "Thank you for joining our Fan Project! 💖",
+    alert_name_required: "⚠️ Please enter your nickname or X account.",
+    alert_played: "⚠️ You have already participated. Thank you! 💖",
+    alert_closed: "⛔ Event is temporarily closed.",
+    share_alert_success: "✅ Image copied! Paste it in X.",
+    share_alert_fail: "📸 Don’t forget to attach the saved image!",
+    share_text: "I just got an amazing wallpaper from Riser Concert Gacha! 🔮✨\n\nJoin Fan Project by @Jaiidees\n\n#RiserConcert #JaiideesGiveaway",
+    chat_title: "Chat with Admin (Live)",
+    chat_placeholder: "Type your message...",
+    chat_contact: "Your Name",
+    chat_send: "Send",
+    chat_admin_name: "Admin @Jaiidees"
+  }
 }
 
 function App() {
-  // --- ROUTING LOGIC ---
   let path = window.location.pathname;
   if (path.endsWith('/') && path.length > 1) path = path.slice(0, -1);
   try { path = decodeURIComponent(path); } catch (e) {}
@@ -88,7 +86,6 @@ function App() {
   if (path === '/@jaiidees_only') return <Admin />;
   if (path !== '/' && path !== '/index.html') return <NotFound />;
 
-  // --- STATE ---
   const [lang, setLang] = useState('th')
   const t = TRANSLATIONS[lang]
 
@@ -98,14 +95,16 @@ function App() {
   const [loadingText, setLoadingText] = useState('Initializing...')
   const [showExample, setShowExample] = useState(false)
   
-  // --- CHAT STATE ---
+  // --- WEBSOCKET CHAT STATE ---
   const [showChat, setShowChat] = useState(false)
   const [chatMsg, setChatMsg] = useState('')
   const [chatHistory, setChatHistory] = useState([])
   const [sessionId, setSessionId] = useState('')
+  const [isConnected, setIsConnected] = useState(false)
+  const ws = useRef(null)
   const chatEndRef = useRef(null)
 
-  // Generate Session ID for Chat (Persistent)
+  // 1. Setup Session ID
   useEffect(() => {
     let sid = localStorage.getItem('chat_session_id')
     if (!sid) {
@@ -115,31 +114,44 @@ function App() {
     setSessionId(sid)
   }, [])
 
-  // Poll Chat History (Every 3s)
+  // 2. Connect WebSocket
   useEffect(() => {
-    if (!showChat) return;
+    if (!showChat || !sessionId) return;
+
+    // Fetch old history first
+    fetch(`/api/chat/history/${sessionId}`)
+        .then(res => res.json())
+        .then(data => {
+            if(data.status === 'success') setChatHistory(data.data)
+        })
+        .catch(console.error)
+
+    // WebSocket Connection
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${protocol}//${window.location.host}/ws/chat`;
     
-    const fetchChat = async () => {
-        try {
-            const res = await fetch(`/api/chat/history/${sessionId}`)
-            const data = await res.json()
-            if (data.status === 'success') {
-                setChatHistory(data.data)
-            }
-        } catch (e) {
-            console.error("Polling error", e)
-        }
+    ws.current = new WebSocket(wsUrl);
+
+    ws.current.onopen = () => {
+        console.log("WS Connected");
+        setIsConnected(true);
+    };
+
+    ws.current.onmessage = (event) => {
+        const msg = JSON.parse(event.data);
+        // Only append if it's relevant to this session (or generic broadcast)
+        // In this simple app, we just append everything received
+        setChatHistory(prev => [...prev, msg])
+    };
+
+    ws.current.onclose = () => setIsConnected(false);
+
+    return () => {
+        if(ws.current) ws.current.close();
     }
-    
-    // Initial fetch
-    fetchChat()
-    
-    // Interval fetch
-    const interval = setInterval(fetchChat, 3000)
-    return () => clearInterval(interval)
   }, [showChat, sessionId])
 
-  // Auto-scroll to bottom of chat
+  // Scroll to bottom
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [chatHistory, showChat])
@@ -193,28 +205,18 @@ function App() {
     }
   }
 
-  const handleSendChat = async () => {
-    if (!chatMsg.trim()) return;
+  const handleSendChat = () => {
+    if (!chatMsg.trim() || !ws.current) return;
     
-    // Optimistic Update (Show immediately)
-    const tempMsg = { sender: 'user', text: chatMsg, timestamp: new Date().toISOString() }
-    setChatHistory([...chatHistory, tempMsg])
-    const msgToSend = chatMsg
-    setChatMsg('')
-
-    try {
-        await fetch('/api/chat/send', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-                session_id: sessionId,
-                message: msgToSend, 
-                name: formData.name || "Fan" 
-            })
-        })
-    } catch (e) {
-        alert("Failed to send message")
+    const payload = {
+        session_id: sessionId,
+        text: chatMsg,
+        sender: 'user',
+        name: formData.name || "Fan"
     }
+    
+    ws.current.send(JSON.stringify(payload));
+    setChatMsg('')
   }
 
   const triggerConfetti = () => {
@@ -257,12 +259,8 @@ function App() {
           <div className="flex items-center gap-3">
             <img src="/logo.png" alt="Logo" className="h-8 w-auto drop-shadow-md" />
             <div className="flex flex-col">
-              <span className="text-xs font-bold tracking-[0.15em] text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-pink-600">
-                RISER CONCERT
-              </span>
-              <span className="text-[8px] text-slate-500 uppercase tracking-widest">
-                {t.subtitle}
-              </span>
+              <span className="text-xs font-bold tracking-[0.15em] text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-pink-600">RISER CONCERT</span>
+              <span className="text-[8px] text-slate-500 uppercase tracking-widest">{t.subtitle}</span>
             </div>
           </div>
           <button onClick={toggleLang} className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 rounded-full text-[10px] font-bold text-slate-600 border border-slate-200">
@@ -282,8 +280,7 @@ function App() {
                 <Sparkles size={12} className="text-pink-500" /><span>{t.special_giveaway}</span>
               </div>
               <h1 className="text-5xl font-black italic leading-tight text-slate-800 drop-shadow-sm">
-                THE FIRST<br/>
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500">RISE</span>
+                THE FIRST<br/><span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500">RISE</span>
               </h1>
             </div>
 
@@ -306,7 +303,6 @@ function App() {
                 <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                   <div className="bg-white/20 backdrop-blur-md p-3 rounded-full border border-white/30 text-white"><Maximize2 size={24} /></div>
                 </div>
-                <div className="absolute bottom-3 left-3 bg-white/90 backdrop-blur-sm px-3 py-1 rounded-full text-[10px] font-bold text-pink-600 shadow-sm">Example by @Jaiidees</div>
               </div>
             </div>
 
@@ -363,7 +359,7 @@ function App() {
               <div className="relative w-full aspect-[9/16] bg-slate-100">
                 <img src={result.image_url} alt="Result" className="w-full h-full object-cover" />
                 <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-md border border-white shadow-sm px-3 py-1 rounded-full flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-pink-500 animate-pulse"></span><span className="text-[10px] font-bold text-pink-600 tracking-wider">{t.ssr_badge}</span>
+                    <span className="w-1.5 h-1.5 rounded-full bg-pink-500 animate-pulse"></span><span className="text-[10px] font-bold text-pink-600 tracking-wider">CARD</span>
                 </div>
               </div>
               <div className="p-6 bg-white relative">
@@ -382,20 +378,25 @@ function App() {
         )}
       </main>
 
-      {/* --- CHAT BUBBLE & WINDOW (NEW) --- */}
+      {/* --- CHAT BUBBLE & WINDOW (WEBSOCKET ENABLED) --- */}
       <div className="fixed bottom-4 right-4 z-[60]">
         {!showChat ? (
           <button 
             onClick={() => setShowChat(true)}
-            className="w-12 h-12 bg-gradient-to-tr from-pink-500 to-purple-500 rounded-full flex items-center justify-center text-white shadow-lg hover:scale-110 transition-transform"
+            className="w-12 h-12 bg-gradient-to-tr from-pink-500 to-purple-500 rounded-full flex items-center justify-center text-white shadow-lg hover:scale-110 transition-transform relative"
           >
             <MessageCircle size={24} />
+            {/* Online Indicator */}
+            <span className={`absolute top-0 right-0 w-3 h-3 rounded-full border-2 border-white ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}></span>
           </button>
         ) : (
             <div className="bg-white rounded-2xl shadow-2xl w-80 h-96 border border-slate-200 overflow-hidden flex flex-col animate-zoom-in">
                 {/* Header */}
                 <div className="bg-slate-100 p-3 border-b border-slate-200 flex justify-between items-center">
-                    <span className="text-xs font-bold text-slate-700">{t.chat_title}</span>
+                    <div className="flex items-center gap-2">
+                        <span className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}></span>
+                        <span className="text-xs font-bold text-slate-700">{t.chat_title}</span>
+                    </div>
                     <button onClick={() => setShowChat(false)} className="text-slate-400 hover:text-slate-600"><X size={16} /></button>
                 </div>
                 
@@ -421,8 +422,9 @@ function App() {
                         value={chatMsg}
                         onChange={(e) => setChatMsg(e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && handleSendChat()}
+                        disabled={!isConnected}
                     />
-                    <button onClick={handleSendChat} className="bg-pink-500 text-white p-2 rounded-lg hover:bg-pink-600 transition-colors">
+                    <button onClick={handleSendChat} disabled={!isConnected} className="bg-pink-500 text-white p-2 rounded-lg hover:bg-pink-600 transition-colors disabled:bg-slate-300">
                         <Send size={16} />
                     </button>
                 </div>

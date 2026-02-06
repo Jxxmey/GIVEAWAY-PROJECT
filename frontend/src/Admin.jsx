@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Lock, Database, Clock, Image as ImageIcon, LogOut, Trash2, FileDown, ShieldCheck, Power, RefreshCw, ChevronLeft, ChevronRight, Inbox, MessageCircle, Send, ArrowLeft } from 'lucide-react'
+import { Lock, Database, Clock, Inbox, LogOut, Trash2, FileDown, Power, RefreshCw, ChevronLeft, ChevronRight, MessageCircle, Send, ArrowLeft } from 'lucide-react'
 
 export default function Admin() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
@@ -11,7 +11,7 @@ export default function Admin() {
   
   // View State
   const [view, setView] = useState('history') // 'history' | 'inbox'
-  const [selectedChat, setSelectedChat] = useState(null) // ห้องแชทที่เปิดอยู่
+  const [selectedChat, setSelectedChat] = useState(null)
   const [replyMsg, setReplyMsg] = useState('')
 
   // Pagination State
@@ -30,10 +30,9 @@ export default function Admin() {
 
   // --- 2. Auto-Refresh Chat (Polling) ---
   useEffect(() => {
-    // ถ้าเปิดห้องแชทค้างไว้ ให้ดึงข้อมูลใหม่ทุก 3 วินาที
     if (!selectedChat) return;
     const interval = setInterval(() => {
-        fetchAllData(secretKey, page, true) // silent refresh
+        fetchAllData(secretKey, page, true) 
     }, 3000);
     return () => clearInterval(interval)
   }, [selectedChat])
@@ -42,11 +41,8 @@ export default function Admin() {
   const fetchAllData = async (key, pageNum = 1, silent=false) => {
     if (!silent) setLoading(true)
     try {
-        // ดึง History (Pagination)
         const resHistory = await fetch(`/api/admin/history?page=${pageNum}&limit=100`, { headers: { 'X-Admin-Key': key } })
-        // ดึง Chat Rooms
         const resChats = await fetch('/api/admin/chats', { headers: { 'X-Admin-Key': key } })
-        // ดึง System Status
         const resStatus = await fetch('/api/admin/system_status', { headers: { 'X-Admin-Key': key } })
         
         if (resHistory.ok && resStatus.ok && resChats.ok) {
@@ -57,7 +53,6 @@ export default function Admin() {
             setData(jsonHistory.data)
             setChats(jsonChats.data)
             
-            // ถ้าเปิดแชทใครค้างไว้ ให้อัปเดตข้อความในห้องนั้นด้วย
             if (selectedChat) {
                 const updatedChat = jsonChats.data.find(c => c.session_id === selectedChat.session_id)
                 if (updatedChat) setSelectedChat(updatedChat)
@@ -65,8 +60,8 @@ export default function Admin() {
 
             if (jsonHistory.pagination) {
                 setPage(jsonHistory.pagination.page)
-                setTotalPages(jsonHistory.pagination.total_pages)
-                setTotalDocs(jsonHistory.pagination.total_docs)
+                setTotalPages(jsonHistory.pagination.total_pages || 1)
+                setTotalDocs(jsonHistory.pagination.total || 0)
             }
             
             setSystemActive(jsonStatus.is_active)
@@ -98,7 +93,7 @@ export default function Admin() {
               body: JSON.stringify({ session_id: selectedChat.session_id, message: replyMsg })
           })
           setReplyMsg('')
-          fetchAllData(secretKey, page, true) // Force refresh immediately
+          fetchAllData(secretKey, page, true)
       } catch (e) {
           alert("Reply failed")
       }
@@ -129,7 +124,7 @@ export default function Admin() {
         const headers = ["Timestamp", "Name", "Gender", "IP Address", "IP Hash", "Message", "Blessing", "Image File"];
         const rows = json.data.map(r => [
             new Date(r.played_at).toLocaleString('en-US'), `"${r.name.replace(/"/g, '""')}"`, r.gender, r.ip_address || "N/A", r.ip_hash,
-            `"${r.blessing.replace(/"/g, '""').replace(/\n/g, ' ')}"`, `"${r.blessing.replace(/"/g, '""').replace(/\n/g, ' ')}"`, r.image_file
+            `"${(r.blessing||"").replace(/"/g, '""').replace(/\n/g, ' ')}"`, r.image_file
         ]);
         const csvContent = "\uFEFF" + [headers.join(","), ...rows.map(e => e.join(","))].join("\n");
         const link = document.createElement("a");
@@ -139,7 +134,6 @@ export default function Admin() {
     } catch (e) { alert("Export Error") }
   }
 
-  // --- 5. Render Login ---
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-4 font-sans text-slate-200">
@@ -152,16 +146,13 @@ export default function Admin() {
     )
   }
 
-  // --- 6. Render Dashboard ---
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-800">
-      {/* Navbar */}
       <nav className="bg-white border-b border-slate-200 px-6 py-4 flex justify-between items-center sticky top-0 z-50 shadow-sm">
         <div className="flex items-center gap-4">
           <div className="bg-blue-100 p-2 rounded-lg text-blue-600"><Database size={20} /></div>
           <div className="hidden md:block"><h1 className="text-sm font-bold text-slate-900">Admin Dashboard</h1><p className="text-[10px] text-slate-500">Records: {totalDocs}</p></div>
           <div className="h-8 w-px bg-slate-200 mx-2 hidden md:block"></div>
-          {/* Menu Switcher */}
           <button onClick={() => { setView('history'); setSelectedChat(null) }} className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-bold ${view === 'history' ? 'bg-blue-50 text-blue-600' : 'text-slate-500 hover:bg-slate-100'}`}><Clock size={16} /> History</button>
           <button onClick={() => { setView('inbox'); setSelectedChat(null) }} className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-bold ${view === 'inbox' ? 'bg-pink-50 text-pink-600' : 'text-slate-500 hover:bg-slate-100'}`}>
             <Inbox size={16} /> Inbox 
@@ -176,10 +167,7 @@ export default function Admin() {
         </div>
       </nav>
 
-      {/* Main Content */}
       <main className="max-w-6xl mx-auto p-4 md:p-6">
-        
-        {/* === VIEW: HISTORY === */}
         {view === 'history' && (
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                 <div className="overflow-x-auto">
@@ -209,11 +197,8 @@ export default function Admin() {
             </div>
         )}
 
-        {/* === VIEW: INBOX (CHAT SYSTEM) === */}
         {view === 'inbox' && (
             <div className="flex flex-col md:flex-row h-[600px] bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                
-                {/* Left Side: Chat List */}
                 <div className={`w-full md:w-1/3 border-r border-slate-200 flex flex-col ${selectedChat ? 'hidden md:flex' : 'flex'}`}>
                     <div className="p-4 bg-slate-50 border-b border-slate-200 font-bold text-slate-700">Inbox ({chats.length})</div>
                     <div className="flex-1 overflow-y-auto p-2 space-y-1">
@@ -230,7 +215,6 @@ export default function Admin() {
                     </div>
                 </div>
 
-                {/* Right Side: Chat Window */}
                 <div className={`w-full md:w-2/3 flex flex-col ${!selectedChat ? 'hidden md:flex' : 'flex'}`}>
                     {!selectedChat ? (
                         <div className="flex-1 flex flex-col items-center justify-center text-slate-300">
@@ -239,20 +223,12 @@ export default function Admin() {
                         </div>
                     ) : (
                         <>
-                            {/* Chat Header */}
                             <div className="p-3 border-b border-slate-200 flex items-center gap-3 bg-white shadow-sm z-10">
                                 <button onClick={() => setSelectedChat(null)} className="md:hidden p-2 hover:bg-slate-100 rounded-full"><ArrowLeft size={18} /></button>
-                                <div>
-                                    <h3 className="font-bold text-slate-800 flex items-center gap-2">
-                                        {selectedChat.name}
-                                        <span className="text-[10px] font-normal px-2 py-0.5 bg-slate-100 rounded text-slate-500">{selectedChat.session_id.substring(0,6)}...</span>
-                                    </h3>
-                                </div>
+                                <div><h3 className="font-bold text-slate-800 flex items-center gap-2">{selectedChat.name}</h3></div>
                             </div>
-
-                            {/* Messages */}
                             <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50/50">
-                                {selectedChat.messages.map((m, i) => (
+                                {selectedChat.messages && selectedChat.messages.map((m, i) => (
                                     <div key={i} className={`flex ${m.sender === 'admin' ? 'justify-end' : 'justify-start'}`}>
                                         <div className={`max-w-[80%] p-3 rounded-2xl text-sm shadow-sm ${m.sender === 'admin' ? 'bg-blue-600 text-white rounded-br-none' : 'bg-white text-slate-700 border border-slate-200 rounded-bl-none'}`}>
                                             {m.text}
@@ -261,20 +237,9 @@ export default function Admin() {
                                     </div>
                                 ))}
                             </div>
-
-                            {/* Reply Input */}
                             <div className="p-3 border-t border-slate-200 bg-white flex gap-2">
-                                <input 
-                                    type="text" 
-                                    className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all" 
-                                    placeholder="Type a reply..." 
-                                    value={replyMsg} 
-                                    onChange={e => setReplyMsg(e.target.value)} 
-                                    onKeyDown={e => e.key === 'Enter' && handleReply()} 
-                                />
-                                <button onClick={handleReply} className="bg-blue-600 text-white px-4 py-2 rounded-xl hover:bg-blue-700 transition-colors shadow-lg shadow-blue-200 flex items-center gap-2">
-                                    <Send size={16} /> <span className="hidden sm:inline">Send</span>
-                                </button>
+                                <input type="text" className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-blue-500" placeholder="Type a reply..." value={replyMsg} onChange={e => setReplyMsg(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleReply()} />
+                                <button onClick={handleReply} className="bg-blue-600 text-white px-4 py-2 rounded-xl hover:bg-blue-700 transition-colors shadow-lg shadow-blue-200 flex items-center gap-2"><Send size={16} /> <span className="hidden sm:inline">Send</span></button>
                             </div>
                         </>
                     )}
