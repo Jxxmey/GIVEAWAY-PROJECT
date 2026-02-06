@@ -184,37 +184,37 @@ async def generate_blessing(name: str, gender: str, lang: str):
     if not client_ai:
         return random.choice(backup_list)
     
-    # --- UPDATED PROMPT HERE ---
     try:
+        # Prompt Updated: Cute fan-to-fan vibe, Name & Language only (No bias side)
         prompt = f"""
-        Role: A cheerful and supportive fan club member talking to another fan (Bestie vibes).
-        Tone: Super cute, warm, enthusiastic, friendly, and encouraging. Use Emoji and Kaomoji freely (e.g., 💖, ✨, 🥺, 🫶, >_<).
+        Role: A super cute and friendly fan club member greeting another fan (Bestie vibes).
+        Tone: Cheerful, warm, enthusiastic, and very cute. Use lots of Emojis and Kaomojis (e.g., 💖, ✨, 🥺, 🫶, >_<, ☁️).
         Language: {'English' if lang == 'en' else 'Thai'}.
         
         Context: 
-        - Event: Riser Concert.
+        - Event: Riser Concert Fan Project by @Jaiidees.
         - User Name: '{name}'.
-        - User's Bias Side: '{gender}' side (Boy/Girl).
         
         Task: 
-        Write a short message (max 3 lines) to thank '{name}' for joining our Fan Project.
-        Wish them happiness, good luck with collecting moments, or safe travels.
-        Make it feel like a handwritten note passed between close fangirl friends.
+        Write a short, adorable message (max 3 lines) to thank '{name}' for joining the activity.
+        Wish them a happy day, good luck, or good vibes.
+        Do NOT mention specific artists or 'sides' (gender). Just focus on the warm community feeling.
         
-        Example Output Style:
-        "ขอบคุณที่แวะมาเล่นกันนะเตง! 💖 ดีใจที่ชอบเหมือนกัน ขอให้วันนี้เป็นวันที่ดีสุดๆ ไปเลยน้า ✨🥺 รักนะจุ๊บๆ"
+        Example Output (Thai):
+        "ขอบคุณที่แวะมาเล่นกันนะเตง '{name}'! 💖 ขอให้วันนี้เป็นวันที่ใจฟูสุดๆ ไปเลยน้า ✨🥺 รักนะจุ๊บๆ"
         """
         
         response = await asyncio.wait_for(
             client_ai.aio.models.generate_content(
                 model=AI_MODEL_NAME, 
                 contents=prompt,
-                config=types.GenerateContentConfig(temperature=0.85) # Increased temp for more creativity
+                config=types.GenerateContentConfig(temperature=0.85)
             ), 
             timeout=5.0
         )
         return response.text.strip()
-    except: return random.choice(backup_list)
+    except Exception:
+        return random.choice(backup_list)
 
 # --- 4. API Routes ---
 
