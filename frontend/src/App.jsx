@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { Sparkles, Download, User, Info, CheckCircle2, Heart, Twitter, Globe } from 'lucide-react'
+// เพิ่ม Maximize2 และ X เข้ามาใน import
+import { Sparkles, Download, User, Info, CheckCircle2, Heart, Maximize2, X, Twitter, Globe } from 'lucide-react'
 import confetti from 'canvas-confetti'
 
 const TRANSLATIONS = {
@@ -323,4 +324,4 @@ export default function Home() {
       </footer>
     </div>
   )
-} 
+}
