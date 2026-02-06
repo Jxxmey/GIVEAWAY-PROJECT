@@ -10,9 +10,6 @@ const TRANSLATIONS = {
   th: {
     subtitle: "Fan Project by @Jaiidees",
     special_giveaway: "Special Giveaway",
-    banner_title: "กิจกรรมพิเศษ! แจกรางวัลส่งตรงถึงบ้าน (เฉพาะประเทศไทย)",
-    banner_desc: "เพียงกรอกชื่อเล่นหรือ Account X ของคุณ ก็สามารถร่วมสนุกและลุ้นรับของรางวัลสุดพิเศษที่จัดทำขึ้นเฉพาะแฟน ๆ จาก Fan Project by @Jaiidees โดยกิจกรรมนี้สงวนสิทธิ์เฉพาะผู้ที่อยู่ในประเทศไทยเท่านั้น",
-    banner_date: "ประกาศผล 28 ก.พ. 2569",
     rules_title: "เงื่อนไขและกติกา",
     rule_1: "จำกัดสิทธิ์การร่วมสนุก 1 ท่าน ต่อ 1 ครั้งเท่านั้น โดยระบบจะทำการตรวจสอบจาก IP Address เพื่อความยุติธรรมของผู้ร่วมกิจกรรมทุกคน",
     rule_2: "ผู้ร่วมกิจกรรมสามารถเลือกประเภทการ์ดที่ต้องการได้ด้วยตนเอง ก่อนเริ่มกระบวนการสุ่มรางวัล",
@@ -48,9 +45,6 @@ const TRANSLATIONS = {
   en: {
   subtitle: "Fan Project by @Jaiidees",
   special_giveaway: "Special Giveaway",
-  banner_title: "Special Event! Home Delivery Rewards (Thailand Only)",
-  banner_desc: "Simply enter your nickname or X account to join the fun and stand a chance to win special rewards created exclusively for fans by Fan Project by @Jaiidees. This event is open to participants residing in Thailand only.",
-  banner_date: "Winner Announcement: Feb 28, 2026",
   rules_title: "Terms & Conditions",
   rule_1: "Limited to one entry per person. Participation is restricted to a single attempt per user, and IP addresses will be checked to ensure fairness.",
   rule_2: "Participants may select their preferred card type before starting the gacha draw.",
