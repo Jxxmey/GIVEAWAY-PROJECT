@@ -445,7 +445,7 @@ async def delete_history(ip_hash: str, request: Request):
     auth_header = request.headers.get("X-Admin-Key")
     if auth_header != ADMIN_SECRET:
         raise HTTPException(401, "Unauthorized")
-    players.delete_one({"ip_hash": ip_hash})
+    players.delete_one({"ip_hash": ip_hash})get_random_image
     return {"status": "deleted"}
 
 # --- Frontend Serving ---
