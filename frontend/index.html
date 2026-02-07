@@ -9,19 +9,28 @@
     <link id="app-manifest" rel="manifest" href="/manifest.json" />
     
     <script>
-      // ตรวจสอบว่าถ้า URL มีคำว่า @jaiidees_only (หน้า Admin)
+      // ตรวจสอบว่าเป็นหน้า Admin หรือไม่
       if (window.location.pathname.includes("@jaiidees_only")) {
-        // ให้เปลี่ยนไปใช้ Manifest ของ Admin แทน (เพื่อให้ Add to Home แล้วแยกแอป)
+        // 1. เปลี่ยนไฟล์ Manifest เป็นของ Admin
         var manifestLink = document.getElementById('app-manifest');
         if (manifestLink) {
             manifestLink.setAttribute('href', '/admin_manifest.json');
         }
-        
-        // เปลี่ยนสี Theme Browser เป็นสีเข้มให้เข้ากับหน้า Admin (Optional)
+
+        // 2. เปลี่ยน Theme Color ให้เป็นสีเข้มตามแอป Admin
         var themeColor = document.querySelector('meta[name="theme-color"]');
         if (themeColor) {
             themeColor.setAttribute('content', '#1e293b');
         }
+
+        // 3. เปลี่ยนชื่อแอปเวลา Add to Homescreen บน iOS
+        var appleTitle = document.querySelector('meta[name="apple-mobile-web-app-title"]');
+        if (appleTitle) {
+            appleTitle.setAttribute('content', 'Riser Admin');
+        }
+
+        // 4. เปลี่ยน Title ของหน้าเว็บ
+        document.title = "Riser Admin System";
       }
     </script>
 
