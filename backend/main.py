@@ -189,7 +189,6 @@ async def generate_blessing(name: str, gender: str, lang: str):
         return random.choice(backup_list)
     
     try:
-        # [แก้ไข] ปรับ Prompt ให้ AI โฟกัสที่การอวยพรผู้เล่น (User) ไม่ใช่ชมโปรเจกต์
         prompt = f"""
         Act as: A super cheerful and supportive fan club friend (Bestie vibes).
         Language: {'English' if lang == 'en' else 'Thai'}.
