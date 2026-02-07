@@ -6,7 +6,25 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <meta name="theme-color" content="#ffffff" />
 
-    <link rel="manifest" href="/manifest.json" />
+    <link id="app-manifest" rel="manifest" href="/manifest.json" />
+    
+    <script>
+      // ตรวจสอบว่าถ้า URL มีคำว่า @jaiidees_only (หน้า Admin)
+      if (window.location.pathname.includes("@jaiidees_only")) {
+        // ให้เปลี่ยนไปใช้ Manifest ของ Admin แทน (เพื่อให้ Add to Home แล้วแยกแอป)
+        var manifestLink = document.getElementById('app-manifest');
+        if (manifestLink) {
+            manifestLink.setAttribute('href', '/admin_manifest.json');
+        }
+        
+        // เปลี่ยนสี Theme Browser เป็นสีเข้มให้เข้ากับหน้า Admin (Optional)
+        var themeColor = document.querySelector('meta[name="theme-color"]');
+        if (themeColor) {
+            themeColor.setAttribute('content', '#1e293b');
+        }
+      }
+    </script>
+
     <link rel="apple-touch-icon" href="/logo.png" />
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
