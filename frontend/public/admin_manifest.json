@@ -2,7 +2,7 @@
   "name": "Riser Admin System",
   "short_name": "Riser Admin",
   "start_url": "/@jaiidees_only",
-  "scope": "/@jaiidees_only",
+  "scope": "/@jaiidees_only/",
   "display": "standalone",
   "background_color": "#1e293b",
   "theme_color": "#1e293b",

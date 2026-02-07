@@ -4,40 +4,28 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/png" href="/logo.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <meta name="theme-color" content="#ffffff" />
-
-    <link id="app-manifest" rel="manifest" href="/manifest.json" />
     
     <script>
-      // ตรวจสอบว่าเป็นหน้า Admin หรือไม่
-      if (window.location.pathname.includes("@jaiidees_only")) {
-        // 1. เปลี่ยนไฟล์ Manifest เป็นของ Admin
-        var manifestLink = document.getElementById('app-manifest');
-        if (manifestLink) {
-            manifestLink.setAttribute('href', '/admin_manifest.json');
-        }
+      (function() {
+        var isAdmin = window.location.pathname.includes("@jaiidees_only");
+        var themeColor = isAdmin ? "#1e293b" : "#ffffff";
+        var manifestFile = isAdmin ? "/admin_manifest.json" : "/manifest.json";
+        var appTitle = isAdmin ? "Riser Admin" : "Riser Gacha";
 
-        // 2. เปลี่ยน Theme Color ให้เป็นสีเข้มตามแอป Admin
-        var themeColor = document.querySelector('meta[name="theme-color"]');
-        if (themeColor) {
-            themeColor.setAttribute('content', '#1e293b');
+        // เขียน Meta Tags ลงไปใน HTML โดยตรงขณะโหลด
+        document.write('<meta name="theme-color" content="' + themeColor + '">');
+        document.write('<meta name="apple-mobile-web-app-title" content="' + appTitle + '">');
+        document.write('<link id="app-manifest" rel="manifest" href="' + manifestFile + '">');
+        
+        if (isAdmin) {
+          document.title = "Riser Admin System";
         }
-
-        // 3. เปลี่ยนชื่อแอปเวลา Add to Homescreen บน iOS
-        var appleTitle = document.querySelector('meta[name="apple-mobile-web-app-title"]');
-        if (appleTitle) {
-            appleTitle.setAttribute('content', 'Riser Admin');
-        }
-
-        // 4. เปลี่ยน Title ของหน้าเว็บ
-        document.title = "Riser Admin System";
-      }
+      })();
     </script>
 
     <link rel="apple-touch-icon" href="/logo.png" />
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="Riser Gacha">
 
     <title>Riser Concert Gacha | Fan Project by @Jaiidees</title>
     <meta name="title" content="Riser Concert Gacha | Fan Project by @Jaiidees" />
