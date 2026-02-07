@@ -110,11 +110,15 @@ STATIC_DIR = "/app/static"
 # Backup Messages
 BACKUP_MESSAGES_TH = [
     "ขอบคุณที่แวะมาหากันน้า! ขอให้วันนี้เป็นวันที่ใจฟูสุดๆ เจอกันในคอนฯ น้า 💖✨",
-    "เย้! ดีใจที่ได้เจอกันนะเตง ขอให้ได้โมเมนต์ดีๆ กลับไปเพียบเลย! สู้ๆ 🫶🥺"
+    "เย้! ดีใจที่ได้เจอกันนะเตง ขอให้ได้โมเมนต์ดีๆ กลับไปเพียบเลย! สู้ๆ 🫶🥺",
+    "วันนี้ต้องเป็นวันที่ดีแน่นอน! ยิ้มเยอะๆ นะคะคนเก่ง ☁️🌈",
+    "ขอให้คอนเสิร์ตสนุกสุดเหวี่ยงไปเลย! เก็บความทรงจำดีๆ กลับไปเยอะๆ น้า 📸🎉"
 ]
 BACKUP_MESSAGES_EN = [
     "Thanks for dropping by, bestie! Hope you have the most magical time at the concert! 💖✨",
-    "Yay! So happy to see you. Wishing you lots of happy moments today! Enjoy! 🫶🥺"
+    "Yay! So happy to see you. Wishing you lots of happy moments today! Enjoy! 🫶🥺",
+    "Have a fantastic day! Keep smiling and enjoy the vibes! ☁️🌈",
+    "Hope you make amazing memories at the concert! Have a blast! 📸🎉"
 ]
 
 # --- 2. Background Tasks ---
@@ -185,38 +189,35 @@ async def generate_blessing(name: str, gender: str, lang: str):
         return random.choice(backup_list)
     
     try:
-        # Prompt Updated: Cute fan-to-fan vibe, Name & Language only (No bias side)
         prompt = f"""
         Role: A super cute and friendly fan club member greeting another fan (Bestie vibes).
-        Tone: Cheerful, warm, enthusiastic, and very cute. Use lots of Emojis and Kaomojis (e.g., 💖, ✨, 🥺, 🫶, >_<, ☁️).
+        Tone: Cheerful, warm, enthusiastic, and very cute. Use lots of Emojis and Kaomojis.
         Language: {'English' if lang == 'en' else 'Thai'}.
-        
-        Context: 
-        - Event: Riser Concert Fan Project by @Jaiidees.
-        - User Name: '{name}'.
-        
-        Task: 
-        Write a short, adorable message (max 3 lines) to thank '{name}' for joining the activity.
-        Wish them a happy day, good luck, or good vibes.
-        Do NOT mention specific artists or 'sides' (gender). Just focus on the warm community feeling.
-        
-        Example Output (Thai):
-        "ขอบคุณที่แวะมาเล่นกันนะเตง '{name}'! 💖 ขอให้วันนี้เป็นวันที่ใจฟูสุดๆ ไปเลยน้า ✨🥺 รักนะจุ๊บๆ"
+        Context: Riser Concert Fan Project by @Jaiidees. User Name: '{name}'.
+        Task: Write a short, adorable message (max 3 lines) to thank '{name}'.
+        Do NOT mention specific artists or 'sides' (gender).
         """
         
+        # เพิ่ม Timeout เป็น 10 วินาที เพื่อลดโอกาส Error ตอนคนใช้งานเยอะ
         response = await asyncio.wait_for(
             client_ai.aio.models.generate_content(
                 model=AI_MODEL_NAME, 
                 contents=prompt,
                 config=types.GenerateContentConfig(temperature=0.85)
             ), 
-            timeout=5.0
+            timeout=10.0 
         )
         return response.text.strip()
-    except Exception:
+    except Exception as e:
+        print(f"⚠️ AI Generation Failed: {e}") # Log error ไว้ดู
         return random.choice(backup_list)
 
 # --- 4. API Routes ---
+@app.get("/api/stats")
+async def get_stats():
+    count = players.count_documents({})
+    # อาจจะบวกเลขหลอกๆ เริ่มต้นได้ เช่น +100 เพื่อความสวยงาม
+    return {"total_plays": count}
 
 @app.get("/api/admin/system_status")
 async def get_system_status(request: Request):
@@ -273,6 +274,7 @@ async def get_export_data(request: Request):
 @app.post("/api/play", dependencies=[Depends(check_rate_limit)])
 async def play_gacha(request: Request):
     try:
+        # ... (Check system status เหมือนเดิม) ...
         system_status = settings.find_one({"key": "system_status"})
         if not system_status.get("is_active", False):
             return {"status": "closed"}
@@ -286,21 +288,36 @@ async def play_gacha(request: Request):
         if "," in client_ip: client_ip = client_ip.split(",")[0].strip()
         ip_hash = get_ip_hash(client_ip)
 
+        # ตรวจสอบประวัติการเล่นเดิม
         old = players.find_one({"ip_hash": ip_hash})
+        
+        # [Logic ใหม่] ถ้าเคยเล่นแล้ว เช็คว่าเป็น 'วันนี้' หรือไม่
         if old:
-            return {
-                "status": "already_played",
-                "data": {
-                    "image_url": f"/api/image/{old['gender']}/{old['image_file']}",
-                    "blessing": old['blessing'],
-                    "rarity": old.get("rarity", "R")
+            last_played = old.get('played_at')
+            # ถ้า last_played เป็น string (กรณี legacy data) ให้แปลงก่อน หรือถ้าเป็น datetime ก็เทียบได้เลย
+            if isinstance(last_played, str):
+                 last_played = datetime.fromisoformat(last_played)
+            
+            # ตัดเวลาออกเหลือแค่วันที่เทียบกัน
+            if last_played.date() == datetime.now().date():
+                return {
+                    "status": "already_played",
+                    "data": {
+                        "image_url": f"/api/image/{old['gender']}/{old['image_file']}",
+                        "blessing": old['blessing'],
+                        "rarity": old.get("rarity", "R")
+                    }
                 }
-            }
+            else:
+                # ถ้าเป็นคนละวัน อนุญาตให้เล่นใหม่ (อัปเดตข้อมูลเดิมทับไปเลย เพราะติด Unique Index)
+                # หมายเหตุ: ถ้าอยากเก็บ History ทุกวัน ต้องแก้ Index MongoDB เป็น (ip_hash + played_at) แทน
+                # แต่วิธีนี้ง่ายสุดสำหรับโครงสร้างเดิม
+                pass 
 
         selected_image, rarity = get_random_image(gender)
         blessing = await generate_blessing(name, gender, lang)
-
-        players.insert_one({
+        
+        new_data = {
             "ip_hash": ip_hash,
             "ip_address": client_ip,
             "gender": gender,
@@ -309,7 +326,14 @@ async def play_gacha(request: Request):
             "rarity": rarity,
             "blessing": blessing,
             "played_at": datetime.now()
-        })
+        }
+
+        if old:
+            # Update ข้อมูลเดิมสำหรับวันใหม่
+            players.update_one({"ip_hash": ip_hash}, {"$set": new_data})
+        else:
+            # Insert ใหม่สำหรับคนไม่เคยเล่น
+            players.insert_one(new_data)
 
         return {
             "status": "success",

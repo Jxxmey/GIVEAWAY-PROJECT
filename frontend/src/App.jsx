@@ -2,9 +2,9 @@ import { useState, useEffect } from 'react'
 import Admin from './Admin'
 import NotFound from './NotFound'
 import './App.css'
-// เพิ่ม Maximize2 และ X เข้ามาใน import ให้ครบ
 import { Sparkles, Download, User, Info, CheckCircle2, Heart, Maximize2, X, Twitter, Globe } from 'lucide-react'
 import confetti from 'canvas-confetti'
+import Swal from 'sweetalert2' // เพิ่ม SweetAlert2
 
 const TRANSLATIONS = {
   th: {
@@ -77,6 +77,15 @@ function Game() {
   const [result, setResult] = useState(null)
   const [loadingText, setLoadingText] = useState('Initializing...')
   const [showExample, setShowExample] = useState(false)
+  const [totalPlays, setTotalPlays] = useState(0) // State สำหรับ Counter
+
+  // --- FETCH STATS ---
+  useEffect(() => {
+    fetch('/api/stats')
+      .then(res => res.json())
+      .then(data => setTotalPlays(data.total_plays || 0))
+      .catch(err => console.error(err))
+  }, [])
 
   // --- HANDLERS ---
   const toggleLang = () => setLang(prev => prev === 'th' ? 'en' : 'th')
@@ -84,7 +93,14 @@ function Game() {
 
   const handleSubmit = async () => {
     if (!formData.name || formData.name.trim() === '') {
-      alert(t.alert_name_required); return;
+      Swal.fire({
+        icon: 'warning',
+        title: 'Oops...',
+        text: t.alert_name_required,
+        confirmButtonColor: '#EC4899',
+        borderRadius: '1rem'
+      });
+      return;
     }
 
     setStep('animating')
@@ -110,19 +126,24 @@ function Game() {
           triggerConfetti()
         }, 2000)
       } else if (data.status === 'already_played') {
-        alert(t.alert_played)
+        Swal.fire({
+            icon: 'info',
+            title: 'Welcome Back!',
+            text: t.alert_played,
+            confirmButtonColor: '#3B82F6'
+        })
         setResult(data.data)
         setStep('result')
       } else if (data.status === 'closed') {
-        alert(t.alert_closed)
+        Swal.fire({ icon: 'error', title: 'Closed', text: t.alert_closed })
         setStep('landing')
       } else {
-        alert("Error, please try again.")
+        Swal.fire({ icon: 'error', title: 'Error', text: "Something went wrong. Please try again." })
         setStep('landing')
       }
     } catch (err) {
       clearInterval(interval)
-      alert("Server connection failed.")
+      Swal.fire({ icon: 'error', title: 'Connection Error', text: "Server connection failed." })
       setStep('landing')
     }
   }
@@ -143,9 +164,19 @@ function Game() {
             const response = await fetch(result.image_url);
             const blob = await response.blob();
             await navigator.clipboard.write([ new ClipboardItem({ [blob.type]: blob }) ]);
-            alert(t.share_alert_success);
+            Swal.fire({
+                icon: 'success',
+                title: 'Copied!',
+                text: t.share_alert_success,
+                timer: 2000,
+                showConfirmButton: false
+            });
         } catch (e) {
-            alert(t.share_alert_fail);
+            Swal.fire({
+                icon: 'info',
+                title: 'Save Image',
+                text: t.share_alert_fail
+            });
         }
     }
     window.open(url, '_blank');
@@ -214,6 +245,13 @@ function Game() {
               <h1 className="text-5xl font-black italic leading-tight text-slate-800 drop-shadow-sm">
                 THE FIRST<br/><span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500">RISE</span>
               </h1>
+              
+              {/* Show Global Counter */}
+              <div className="text-center">
+                 <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/50 border border-white/50 text-xs font-bold text-slate-500 backdrop-blur-sm shadow-sm">
+                    🎁 Played: <span className="text-pink-500 text-sm">{totalPlays.toLocaleString()}</span> times
+                 </span>
+              </div>
             </div>
 
             <div className="bg-white/80 backdrop-blur-xl border border-white rounded-3xl p-6 shadow-xl shadow-purple-100/50 relative overflow-hidden group hover:scale-[1.01] transition-transform duration-500">
