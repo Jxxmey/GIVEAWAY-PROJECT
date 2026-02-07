@@ -31,7 +31,7 @@ const TRANSLATIONS = {
     footer_thankyou: "ขอบคุณที่ร่วมสนุกกับกิจกรรม Fan Project ของพวกเรานะครับ 💖",
     alert_name_required: "⚠️ กรุณากรอกชื่อเล่น หรือ Account X",
     alert_played: "⚠️ คุณได้ใช้สิทธิ์เข้าร่วมกิจกรรมนี้ไปแล้ว ขอบคุณที่ร่วมสนุกครับ 💖",
-    alert_closed: "⛔ กิจกรรมปิดปรับปรุงชั่วคราว",
+    alert_closed: "😴 ระบบขอพักเติมพลังแป๊บนึงน้า เดี๋ยวกลับมาใหม่นะ! ✨",
     share_alert_success: "✅ คัดลอกรูปแล้ว! กด Paste ใน X ได้เลย",
     share_alert_fail: "📸 อย่าลืมแนบรูปที่ Save ไว้ไปอวดเพื่อนๆ นะ!",
     share_text: "สุ่มกาชา Riser Concert ได้รูปสวยมาก! 🔮✨\n\nมาเล่นกันที่ Fan Project by @Jaiidees\n\n#RiserConcert #JaiideesGiveaway"
@@ -60,7 +60,7 @@ const TRANSLATIONS = {
     footer_thankyou: "Thank you for joining our Fan Project! 💖",
     alert_name_required: "⚠️ Please enter your nickname or X account.",
     alert_played: "⚠️ You have already participated. Thank you! 💖",
-    alert_closed: "⛔ Event is temporarily closed.",
+    alert_closed: "😴 System is taking a nap (Maintenance). Be back soon! ✨",
     share_alert_success: "✅ Image copied! Paste it in X.",
     share_alert_fail: "📸 Don’t forget to attach the saved image!",
     share_text: "I just got an amazing wallpaper from Riser Concert Gacha! 🔮✨\n\nJoin Fan Project by @Jaiidees\n\n#RiserConcert #JaiideesGiveaway"
