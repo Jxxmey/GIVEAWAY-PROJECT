@@ -189,16 +189,27 @@ async def generate_blessing(name: str, gender: str, lang: str):
         return random.choice(backup_list)
     
     try:
+        # [แก้ไข] ปรับ Prompt ให้ AI โฟกัสที่การอวยพรผู้เล่น (User) ไม่ใช่ชมโปรเจกต์
         prompt = f"""
-        Role: A super cute and friendly fan club member greeting another fan (Bestie vibes).
-        Tone: Cheerful, warm, enthusiastic, and very cute. Use lots of Emojis and Kaomojis.
+        Act as: A super cheerful and supportive fan club friend (Bestie vibes).
         Language: {'English' if lang == 'en' else 'Thai'}.
-        Context: Riser Concert Fan Project by @Jaiidees. User Name: '{name}'.
-        Task: Write a short, adorable message (max 3 lines) to thank '{name}'.
-        Do NOT mention specific artists or 'sides' (gender).
+        Target Audience: A fan named '{name}' who just played a Gacha game.
+        Event: Riser Concert.
+
+        Task: Write a short, cute "Blessing Message" for '{name}'.
+        1. Thank them for joining/playing.
+        2. Wish them good luck for the concert (e.g., have the best time, get noticed by artist, make happy memories).
+        3. Tone: Very cute, warm, and encouraging. Use Emojis & Kaomojis (e.g. 💖, ✨, 🥺,(≧◡≦)).
+        
+        Constraints:
+        - Short & Sweet (Max 2-3 sentences).
+        - Focus ONLY on '{name}'s happiness. 
+        - DO NOT mention the "project creator" or praise the "project success".
+        
+        Example Output (Thai):
+        "ขอบคุณที่แวะมาเล่นกันน้า '{name}'! 💖 ขอให้คอนเสิร์ตครั้งนี้เป็นวันที่ดีที่สุด ได้โมเมนต์ฟินๆ กลับไปเพียบเลยนะ! ✨ สู้ๆ!"
         """
         
-        # เพิ่ม Timeout เป็น 10 วินาที เพื่อลดโอกาส Error ตอนคนใช้งานเยอะ
         response = await asyncio.wait_for(
             client_ai.aio.models.generate_content(
                 model=AI_MODEL_NAME, 
