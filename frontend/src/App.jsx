@@ -158,7 +158,10 @@ function Game() {
   }
 
   const handleShareTwitter = async () => {
-    const url = `https://twitter.com/intent/tweet?text=${encodeURIComponent(t.share_text)}&url=${encodeURIComponent(window.location.href)}`;
+    // [แก้ไข] ใช้ลิงก์ใหม่ตามที่ต้องการเพื่อแก้ปัญหา Cache ของ Twitter
+    const shareUrl = "http://slipwake.online/?v1";
+    const url = `https://twitter.com/intent/tweet?text=${encodeURIComponent(t.share_text)}&url=${encodeURIComponent(shareUrl)}`;
+    
     if (result && result.image_url) {
         try {
             const response = await fetch(result.image_url);
