@@ -7,7 +7,8 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['Kanit', 'Inter', 'sans-serif'],
+        // ใช้ Prompt เป็นอันดับแรก
+        sans: ['Prompt', 'Inter', 'sans-serif'],
       },
       animation: {
         'fade-in': 'fadeIn 0.8s ease-out forwards',
